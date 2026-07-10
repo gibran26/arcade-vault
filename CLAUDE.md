@@ -8,16 +8,11 @@ Este archivo proporciona guía a Claude Code (claude.ai/code) al trabajar con c�
 
 Este proyecto usa Next.js 16.2.10, una versión con cambios importantes respecto al Next.js "clásico" que pueda estar en tus datos de entrenamiento (APIs, convenciones y estructura de archivos pueden diferir). **Antes de escribir código**, consulta la guía relevante en `node_modules/next/dist/docs/` (organizada en `01-app/` para el App Router y `02-pages/` para el Pages Router) y respeta los avisos de deprecación que encuentres ahí.
 
-## Comandos
-
-```bash
-npm run dev      # Servidor de desarrollo (usa Turbopack por defecto en Next 16)
-npm run build    # Build de producción
-npm run start    # Servidor de producción (requiere build previo)
-npm run lint     # ESLint (eslint-config-next: core-web-vitals + typescript)
-```
-
 No hay un runner de tests configurado todavía en este proyecto.
+
+## Skills
+
+Usa siempre /frontend-design cuando requieras diseñar interfaces de usuario.
 
 ## Arquitectura
 
