@@ -1,6 +1,6 @@
 # 01 — MVP pantallas visuales
 
-**Estado:** Aprobado
+**Estado:** Implementado
 **Depende de:** Ninguno (primer spec del proyecto)
 **Fecha:** 2026-07-10
 **Objetivo:** Construir la interfaz visual completa de las 5 pantallas de Arcade Vault (biblioteca, detalle de juego, reproductor simulado, autenticación y salón de la fama) sobre Next.js App Router, con datos mock e interactividad de cliente, sin implementar ningún motor de juego real.
@@ -93,18 +93,18 @@ Exporta `PLAYERS: string[]` (los 18 nombres mock) y `seededScores(seed: number, 
 
 ## Criterios de aceptación
 
-- [ ] `app/data/types.ts`, `app/data/games.ts` y `app/data/players.ts` existen, compilan sin errores de TypeScript, y `GAMES` contiene los 8 juegos con los mismos datos que `data.jsx`.
-- [ ] `AuthProvider` envuelve la app en `layout.tsx`; iniciar sesión, crear cuenta o entrar como invitado en `/auth` actualiza el Nav (nombre de usuario visible) y persiste tras recargar la página (`localStorage`).
-- [ ] Cerrar sesión desde el Nav vuelve a mostrar el botón "Iniciar Sesión" y elimina el usuario de `localStorage`.
-- [ ] `/` muestra el grid de 8 juegos; escribir en el buscador filtra por título en tiempo real; hacer clic en un chip de categoría filtra por categoría; combinar ambos filtros funciona; sin resultados muestra el estado vacío.
-- [ ] Clic en una tarjeta o en "JUGAR" navega a `/game/[id]` con el juego correcto.
-- [ ] `/game/[id]` muestra la info del juego y una tabla de leaderboard con 10 filas ordenadas por puntuación descendente; `/game/id-inexistente` devuelve 404.
-- [ ] `/game/[id]/play` incrementa la puntuación automáticamente cada ~220ms mientras no está en pausa ni terminado; "PAUSA" detiene el incremento y "REANUDAR" lo retoma; "FIN" abre el modal de fin de juego con la puntuación final.
-- [ ] En el modal de fin de juego, "GUARDAR PUNTUACIÓN" muestra el toast "▸ PUNTUACIÓN GUARDADA_" sin escribir en `localStorage`; "JUGAR DE NUEVO" reinicia el estado de la partida; "VOLVER AL VAULT" navega a `/`.
-- [ ] `/auth`: clic en "CREAR CUENTA" muestra el campo de correo; clic en "INICIAR SESIÓN" lo oculta; enviar el formulario inicia sesión y redirige a `/`; pulsar "JUGAR COMO INVITADO" redirige a `/` sin iniciar sesión (`login(null)`), igual que en la plantilla original.
-- [ ] `/hall-of-fame` muestra chips por cada uno de los 8 juegos; hacer clic en un chip cambia el podio (top 3) y la tabla a las puntuaciones de ese juego; si hay sesión iniciada, se muestra la fila "tu mejor marca".
-- [ ] El Nav marca como activo el link correspondiente en `/`, `/game/[id]`, `/game/[id]/play` (Biblioteca) y `/hall-of-fame` (Salón de la Fama); en mobile (<840px) se oculta y aparece el botón hamburguesa que abre el panel lateral.
-- [ ] `npm run build` compila sin errores de TypeScript ni de ESLint.
+- [x] `app/data/types.ts`, `app/data/games.ts` y `app/data/players.ts` existen, compilan sin errores de TypeScript, y `GAMES` contiene los 8 juegos con los mismos datos que `data.jsx`.
+- [x] `AuthProvider` envuelve la app en `layout.tsx`; iniciar sesión, crear cuenta o entrar como invitado en `/auth` actualiza el Nav (nombre de usuario visible) y persiste tras recargar la página (`localStorage`).
+- [x] Cerrar sesión desde el Nav vuelve a mostrar el botón "Iniciar Sesión" y elimina el usuario de `localStorage`.
+- [x] `/` muestra el grid de 8 juegos; escribir en el buscador filtra por título en tiempo real; hacer clic en un chip de categoría filtra por categoría; combinar ambos filtros funciona; sin resultados muestra el estado vacío.
+- [x] Clic en una tarjeta o en "JUGAR" navega a `/game/[id]` con el juego correcto.
+- [x] `/game/[id]` muestra la info del juego y una tabla de leaderboard con 10 filas ordenadas por puntuación descendente; `/game/id-inexistente` devuelve 404.
+- [x] `/game/[id]/play` incrementa la puntuación automáticamente cada ~220ms mientras no está en pausa ni terminado; "PAUSA" detiene el incremento y "REANUDAR" lo retoma; "FIN" abre el modal de fin de juego con la puntuación final.
+- [x] En el modal de fin de juego, "GUARDAR PUNTUACIÓN" muestra el toast "▸ PUNTUACIÓN GUARDADA_" sin escribir en `localStorage`; "JUGAR DE NUEVO" reinicia el estado de la partida; "VOLVER AL VAULT" navega a `/`.
+- [x] `/auth`: clic en "CREAR CUENTA" muestra el campo de correo; clic en "INICIAR SESIÓN" lo oculta; enviar el formulario inicia sesión y redirige a `/`; pulsar "JUGAR COMO INVITADO" redirige a `/` sin iniciar sesión (`login(null)`), igual que en la plantilla original.
+- [x] `/hall-of-fame` muestra chips por cada uno de los 8 juegos; hacer clic en un chip cambia el podio (top 3) y la tabla a las puntuaciones de ese juego; si hay sesión iniciada, se muestra la fila "tu mejor marca".
+- [x] El Nav marca como activo el link correspondiente en `/`, `/game/[id]`, `/game/[id]/play` (Biblioteca) y `/hall-of-fame` (Salón de la Fama); en mobile (<840px) se oculta y aparece el botón hamburguesa que abre el panel lateral.
+- [x] `npm run build` compila sin errores de TypeScript ni de ESLint.
 
 ## Decisiones tomadas y descartadas
 
