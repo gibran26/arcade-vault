@@ -85,7 +85,7 @@ Exporta `PLAYERS: string[]` (los 18 nombres mock) y `seededScores(seed: number, 
 
 6. **Reproductor (`/game/[id]/play`)** — Crear `app/game/[id]/play/page.tsx` (client component): HUD con puntuación simulada (`setInterval`), vidas, nivel, pausa, marco CRT decorativo, modal de fin de juego con input de iniciales y botón "Guardar puntuación" (solo toast, sin persistencia), "Jugar de nuevo" y "Volver al Vault".
 
-7. **Auth (`/auth`)** — Crear `app/auth/page.tsx` (client component): tabs "Iniciar sesión"/"Crear cuenta" funcionales, formulario, botón "Jugar como invitado", botones sociales decorativos. Al enviar/continuar como invitado, llama a `login()` del `AuthProvider` y redirige a `/`.
+7. **Auth (`/auth`)** — Crear `app/auth/page.tsx` (client component): tabs "Iniciar sesión"/"Crear cuenta" funcionales, formulario, botón "Jugar como invitado", botones sociales decorativos. Al enviar el formulario, llama a `login()` del `AuthProvider` con el usuario y redirige a `/`. "Jugar como invitado" llama a `login(null)` (no inicia sesión, igual que en la plantilla original) y redirige a `/`.
 
 8. **Salón de la Fama (`/hall-of-fame`)** — Crear `app/hall-of-fame/page.tsx` (client component): chips por juego (tab activo en estado local), `components/Podium.tsx` (top 3), tabla de puntuaciones, fila "tu mejor marca" si `useAuth()` tiene usuario.
 
@@ -101,7 +101,7 @@ Exporta `PLAYERS: string[]` (los 18 nombres mock) y `seededScores(seed: number, 
 - [ ] `/game/[id]` muestra la info del juego y una tabla de leaderboard con 10 filas ordenadas por puntuación descendente; `/game/id-inexistente` devuelve 404.
 - [ ] `/game/[id]/play` incrementa la puntuación automáticamente cada ~220ms mientras no está en pausa ni terminado; "PAUSA" detiene el incremento y "REANUDAR" lo retoma; "FIN" abre el modal de fin de juego con la puntuación final.
 - [ ] En el modal de fin de juego, "GUARDAR PUNTUACIÓN" muestra el toast "▸ PUNTUACIÓN GUARDADA_" sin escribir en `localStorage`; "JUGAR DE NUEVO" reinicia el estado de la partida; "VOLVER AL VAULT" navega a `/`.
-- [ ] `/auth`: clic en "CREAR CUENTA" muestra el campo de correo; clic en "INICIAR SESIÓN" lo oculta; enviar el formulario o pulsar "JUGAR COMO INVITADO" inicia sesión y redirige a `/`.
+- [ ] `/auth`: clic en "CREAR CUENTA" muestra el campo de correo; clic en "INICIAR SESIÓN" lo oculta; enviar el formulario inicia sesión y redirige a `/`; pulsar "JUGAR COMO INVITADO" redirige a `/` sin iniciar sesión (`login(null)`), igual que en la plantilla original.
 - [ ] `/hall-of-fame` muestra chips por cada uno de los 8 juegos; hacer clic en un chip cambia el podio (top 3) y la tabla a las puntuaciones de ese juego; si hay sesión iniciada, se muestra la fila "tu mejor marca".
 - [ ] El Nav marca como activo el link correspondiente en `/`, `/game/[id]`, `/game/[id]/play` (Biblioteca) y `/hall-of-fame` (Salón de la Fama); en mobile (<840px) se oculta y aparece el botón hamburguesa que abre el panel lateral.
 - [ ] `npm run build` compila sin errores de TypeScript ni de ESLint.
@@ -114,5 +114,6 @@ Exporta `PLAYERS: string[]` (los 18 nombres mock) y `seededScores(seed: number, 
 - **Datos mock en `app/data/`** (no en `lib/` ni inline en componentes), explícitamente pensado como el punto de reemplazo futuro por una base de datos real.
 - **Sesión simulada vía Context Provider de cliente** (`AuthProvider`) en vez de lectura directa de `localStorage` en cada componente, para evitar desincronización entre Nav, Auth y Salón de la Fama.
 - **La puntuación del reproductor NO se persiste en `localStorage`** al guardar (a diferencia del template original que sí la guardaba en `av_scores`), porque no hay partidas reales todavía — solo se muestra el toast de confirmación visual. Decisión revisada explícitamente durante la definición del spec tras dudas sobre el propósito de la simulación decorativa del reproductor.
+- **"Jugar como invitado" en `/auth` llama a `login(null)`** (no inicia sesión de verdad), replicando exactamente el comportamiento de `auth.jsx` en la plantilla original, en vez de crear un usuario "INVITADO" ficticio. Decisión confirmada explícitamente durante la implementación tras una ambigüedad entre el texto original del criterio de aceptación (que sugería "iniciar sesión") y el comportamiento real de la plantilla.
 - **Toda la interactividad de cliente presente en las plantillas se conserva** (búsqueda, filtros, tabs, tilt, pausa/fin de juego), en vez de dejar pantallas puramente estáticas — se acordó portar fielmente el comportamiento del template, con los mock data desacoplados en `app/data/` para facilitar el reemplazo futuro por datos reales.
 - **Sin sección de riesgos**: al ser una migración de plantillas ya validadas visualmente hacia una arquitectura de rutas estándar de Next.js, sin backend ni lógica de negocio nueva, no se identificaron riesgos relevantes que ameriten seguimiento propio.
