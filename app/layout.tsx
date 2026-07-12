@@ -36,7 +36,7 @@ export default function RootLayout({
             <main className="av-main">{children}</main>
             <footer
               style={{
-                borderTop: "1px solid var(--line)",
+                borderTop: "1px solid rgba(0, 245, 255, 0.35)",
                 padding: "20px 32px",
                 textAlign: "center",
                 color: "var(--ink-faint)",
