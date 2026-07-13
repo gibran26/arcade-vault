@@ -52,13 +52,13 @@ Esta funcionalidad no introduce nuevas estructuras de datos. Reutiliza `GAMES` d
 
 ## Criterios de aceptación
 
-- [ ] `/` muestra la nueva landing (hero, "¿Por qué Arcade Vault?", rail de juegos destacados, stats, actividad en vivo, pricing, CTA final), visualmente equivalente a `home.jsx` + `styles.css`, con el efecto de aparición al hacer scroll funcionando en cada sección `.reveal`.
-- [ ] En la landing: "EXPLORAR JUEGOS", "VER TODOS LOS JUEGOS" y el CTA final "INSERTAR MONEDA" navegan a `/games`; "CREAR CUENTA" y "EMPEZAR GRATIS" navegan a `/auth`; cada `MiniCard` del rail navega a `/game/[id]` correspondiente; "VER SALÓN →" navega a `/hall-of-fame`.
-- [ ] `/games` muestra el grid de 8 juegos con búsqueda y filtro por categoría funcionando exactamente igual que la biblioteca actual en `/` antes de este spec.
-- [ ] El Nav muestra "Inicio", "Biblioteca" y "Salón de la Fama" (sin "Acerca de"); "Inicio" está activo solo en `/`; "Biblioteca" está activo en `/games`, `/game/[id]` y `/game/[id]/play`; el logo navega a `/`. Esto aplica tanto en el Nav de escritorio como en el panel móvil.
-- [ ] En `/auth`, iniciar sesión, crear cuenta y "Jugar como invitado" redirigen a `/games` (ya no a `/`).
-- [ ] En `/game/[id]` y `/game/[id]/play`, los botones "Volver" / "Volver al Vault" navegan a `/games`.
-- [ ] `npm run build` compila sin errores de TypeScript ni de ESLint.
+- [x] `/` muestra la nueva landing (hero, "¿Por qué Arcade Vault?", rail de juegos destacados, stats, actividad en vivo, pricing, CTA final), visualmente equivalente a `home.jsx` + `styles.css`, con el efecto de aparición al hacer scroll funcionando en cada sección `.reveal`.
+- [x] En la landing: "EXPLORAR JUEGOS", "VER TODOS LOS JUEGOS" y el CTA final "INSERTAR MONEDA" navegan a `/games`; "CREAR CUENTA" y "EMPEZAR GRATIS" navegan a `/auth`; cada `MiniCard` del rail navega a `/game/[id]` correspondiente; "VER SALÓN →" navega a `/hall-of-fame`.
+- [x] `/games` muestra el grid de 8 juegos con búsqueda y filtro por categoría funcionando exactamente igual que la biblioteca actual en `/` antes de este spec.
+- [x] El Nav muestra "Inicio", "Biblioteca" y "Salón de la Fama" (sin "Acerca de"); "Inicio" está activo solo en `/`; "Biblioteca" está activo en `/games`, `/game/[id]` y `/game/[id]/play`; el logo navega a `/`. Esto aplica tanto en el Nav de escritorio como en el panel móvil.
+- [x] En `/auth`, iniciar sesión, crear cuenta y "Jugar como invitado" redirigen a `/games` (ya no a `/`).
+- [x] En `/game/[id]` y `/game/[id]/play`, los botones "Volver" / "Volver al Vault" navegan a `/games`.
+- [x] `npm run build` compila sin errores de TypeScript ni de ESLint.
 
 ## Decisiones tomadas y descartadas
 
