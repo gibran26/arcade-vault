@@ -1,6 +1,6 @@
 # 02 — Homepage (landing)
 
-**Estado:** Aprobado
+**Estado:** Implementado
 **Depende de:** `01-mvp-pantallas-visuales` (Nav, AuthProvider, `app/data/games.ts`, sistema visual en `globals.css`)
 **Fecha:** 2026-07-13
 **Objetivo:** Construir la landing page de marketing de Arcade Vault en `/` a partir de la plantilla `references/templates/home-about/home.jsx`, reubicando la biblioteca de juegos actual de `/` a `/games` y actualizando el Nav y los enlaces internos para reflejar la nueva estructura de rutas.
