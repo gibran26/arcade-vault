@@ -1,6 +1,6 @@
 # 03 — About page y envío de correos
 
-**Estado:** Aprobado
+**Estado:** Implementado
 **Depende de:** `02-homepage` (Nav, estructura de rutas `/`, `/games`, `/auth`, `/hall-of-fame`)
 **Fecha:** 2026-07-14
 **Objetivo:** Construir la página "Acerca de" en `/about` a partir de la plantilla `references/templates/home-about/about.jsx`, con un formulario de contacto que envía correos reales vía Resend a través de un Server Action, y agregar el link "Acerca de" al Nav.
@@ -75,15 +75,15 @@ Este tipo vive junto al Server Action (`app/about/actions.ts`), sin necesidad de
 
 ## Criterios de aceptación
 
-- [ ] `/about` muestra el hero ("Acerca de Arcade Vault", misión, 3 highlights), el divider animado y la sección de contacto (intro + tips + formulario), visualmente equivalente a `about.jsx` + `styles.css`, con el efecto de aparición al hacer scroll funcionando.
-- [ ] Si algún campo del formulario (nombre, correo, mensaje) está vacío al enviar, se muestra el efecto de "shake" y no se invoca el envío de correo.
-- [ ] Al enviar el formulario con los 3 campos completos y `RESEND_API_KEY`/`CONTACT_EMAIL` configuradas correctamente, se envía un correo real a `CONTACT_EMAIL` desde `onboarding@resend.dev` con `replyTo` igual al correo ingresado, y el formulario muestra la terminal falsa de éxito con el nombre del remitente.
-- [ ] Desde la terminal de éxito, el botón "ENVIAR OTRO MENSAJE" resetea el formulario a su estado editable vacío.
-- [ ] Si el envío por Resend falla (API key inválida/faltante, error de red, etc.), se muestra un mensaje de error simple en vez de la terminal de éxito, y el usuario puede reintentar sin perder lo ya escrito.
-- [ ] Mientras el envío está en curso, el botón de envío queda deshabilitado (no se puede enviar dos veces el mismo formulario).
-- [ ] El Nav muestra "Inicio", "Biblioteca", "Salón de la Fama" y "Acerca de" (en ese orden); "Acerca de" está activo solo en `/about`. Esto aplica tanto en el Nav de escritorio como en el panel móvil.
-- [ ] `.env.local.example` documenta `RESEND_API_KEY` y `CONTACT_EMAIL` sin valores reales.
-- [ ] `npm run build` compila sin errores de TypeScript ni de ESLint.
+- [x] `/about` muestra el hero ("Acerca de Arcade Vault", misión, 3 highlights), el divider animado y la sección de contacto (intro + tips + formulario), visualmente equivalente a `about.jsx` + `styles.css`, con el efecto de aparición al hacer scroll funcionando.
+- [x] Si algún campo del formulario (nombre, correo, mensaje) está vacío al enviar, se muestra el efecto de "shake" y no se invoca el envío de correo.
+- [x] Al enviar el formulario con los 3 campos completos y `RESEND_API_KEY`/`CONTACT_EMAIL` configuradas correctamente, se envía un correo real a `CONTACT_EMAIL` desde `onboarding@resend.dev` con `replyTo` igual al correo ingresado, y el formulario muestra la terminal falsa de éxito con el nombre del remitente.
+- [x] Desde la terminal de éxito, el botón "ENVIAR OTRO MENSAJE" resetea el formulario a su estado editable vacío.
+- [x] Si el envío por Resend falla (API key inválida/faltante, error de red, etc.), se muestra un mensaje de error simple en vez de la terminal de éxito, y el usuario puede reintentar sin perder lo ya escrito.
+- [x] Mientras el envío está en curso, el botón de envío queda deshabilitado (no se puede enviar dos veces el mismo formulario).
+- [x] El Nav muestra "Inicio", "Biblioteca", "Salón de la Fama" y "Acerca de" (en ese orden); "Acerca de" está activo solo en `/about`. Esto aplica tanto en el Nav de escritorio como en el panel móvil.
+- [x] `.env.local.example` documenta `RESEND_API_KEY` y `CONTACT_EMAIL` sin valores reales.
+- [x] `npm run build` compila sin errores de TypeScript ni de ESLint.
 
 ## Decisiones tomadas y descartadas
 
