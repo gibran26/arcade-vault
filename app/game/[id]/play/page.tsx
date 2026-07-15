@@ -51,7 +51,7 @@ export default function GamePlayerPage({
       onScoreChange: setScore,
       onLivesChange: setLives,
       onGameOver: () => {},
-      onPauseChange: () => {},
+      onPauseChange: setPaused,
     });
     engineRef.current = engine;
     return () => {
@@ -60,6 +60,14 @@ export default function GamePlayerPage({
     };
   }, [isAsteroids]);
 
+  const togglePause = () => {
+    if (isAsteroids) {
+      if (paused) engineRef.current?.resume();
+      else engineRef.current?.pause();
+      return;
+    }
+    setPaused((p) => !p);
+  };
   const endGame = () => setOver(true);
   const restart = () => {
     setScore(0);
@@ -96,7 +104,7 @@ export default function GamePlayerPage({
           </div>
         </div>
         <div className="hud-actions">
-          <button className="btn yellow" onClick={() => setPaused((p) => !p)}>
+          <button className="btn yellow" onClick={togglePause}>
             {paused ? 'REANUDAR' : 'PAUSA'}
           </button>
           <button className="btn magenta" onClick={endGame}>
