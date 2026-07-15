@@ -45,19 +45,27 @@ export default function GamePlayerPage({
     if (score > 0 && score % 2500 < 100) setLevel((l) => l + 1);
   }, [isAsteroids, score]);
 
-  useEffect(() => {
-    if (!isAsteroids || !canvasRef.current) return;
-    const engine = createGame(canvasRef.current, {
+  const startEngine = () => {
+    if (!canvasRef.current) return;
+    engineRef.current = createGame(canvasRef.current, {
       onScoreChange: setScore,
       onLivesChange: setLives,
-      onGameOver: () => {},
+      onGameOver: (finalScore) => {
+        setScore(finalScore);
+        setOver(true);
+      },
       onPauseChange: setPaused,
     });
-    engineRef.current = engine;
+  };
+
+  useEffect(() => {
+    if (!isAsteroids) return;
+    startEngine();
     return () => {
-      engine.destroy();
+      engineRef.current?.destroy();
       engineRef.current = null;
     };
+     
   }, [isAsteroids]);
 
   const togglePause = () => {
@@ -70,6 +78,10 @@ export default function GamePlayerPage({
   };
   const endGame = () => setOver(true);
   const restart = () => {
+    if (isAsteroids) {
+      engineRef.current?.destroy();
+      startEngine();
+    }
     setScore(0);
     setLives(3);
     setLevel(1);
