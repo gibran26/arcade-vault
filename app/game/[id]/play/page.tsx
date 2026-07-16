@@ -58,6 +58,7 @@ export default function GamePlayerPage({
         setOver(true);
       },
       onPauseChange: setPaused,
+      onLevelChange: setLevel,
     });
   };
 

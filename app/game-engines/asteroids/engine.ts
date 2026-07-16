@@ -383,6 +383,7 @@ export function createGame(
     setScore(0);
     setLives(3);
     spawnAsteroids(4);
+    callbacks.onLevelChange?.(level);
   }
 
   function nextLevel() {
@@ -394,6 +395,7 @@ export function createGame(
     killsSinceSpawn = 0;
     ship.reset();
     spawnAsteroids(3 + level);
+    callbacks.onLevelChange?.(level);
   }
 
   function explode(x: number, y: number, count = 8) {
