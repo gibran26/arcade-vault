@@ -1,6 +1,6 @@
 # 05 — Juego Asteroids (motor real)
 
-**Estado:** Aprobado
+**Estado:** Implementado
 **Depende de:** ninguno (usa la estructura de rutas /game/[id] y /game/[id]/play ya existentes)
 **Fecha:** 2026-07-15
 **Objetivo:** Portar el motor real de Asteroids (references/started-games/02-asteroids/game.js) a un módulo TypeScript que se ejecute dentro del canvas de /game/asteroids/play, notificando a React los cambios de puntaje y vidas para alimentar el HUD existente, en lugar de la simulación aleatoria actual.
@@ -148,3 +148,7 @@ Esta funcionalidad no introduce nuevas tablas ni persistencia — solo estructur
 - **`dt` sin cap al recuperar foco de pestaña**: `game.js` original cappea `dt` a 50ms para evitar el "spiral of death" tras un `tab blur` prolongado; si se pierde ese detalle durante el puerto a TypeScript, pausar/reanudar el navegador de pestaña (no el botón de pausa) podría causar saltos bruscos o colisiones extrañas. Mitigación: preservar explícitamente ese cap al portar el loop.
 - **Tamaño fijo de canvas (800×600) en un layout responsive**: el resto de la UI de Arcade Vault es fluida; un canvas de tamaño fijo podría desbordar o verse pequeño en pantallas angostas dentro del `crt-screen`. Mitigación: no forma parte del alcance de este spec ajustar el CSS del contenedor `crt`/`crt-screen` más allá de encajar el canvas existente; si se ve mal, queda para un spec de responsive/UI futuro.
 - **Doble invocación de `onGameOver`**: si la lógica de colisión de la nave no queda debidamente encapsulada, es posible que múltiples colisiones en el mismo frame (o un `dt` grande tras recuperar foco) disparen `onLivesChange(0)` y `onGameOver(finalScore)` más de una vez, provocando que React intente mostrar el modal "FIN DEL JUEGO" repetidamente o con puntajes inconsistentes. Mitigación: el engine debe usar una bandera interna (`gameOverFired`) para garantizar que `onGameOver` se invoque como máximo una vez por partida, sin importar cuántas colisiones ocurran después de llegar a 0 vidas.
+
+## Pendiente para spec futuro
+
+- **Confirmado durante la verificación manual (Paso 8)**: el riesgo de "Tamaño fijo de canvas (800×600) en un layout responsive" (ver arriba) se materializó — en laptops/viewports angostos el `crt-screen` queda con espacio negro sobrante debajo del canvas, y el usuario reportó dificultad para jugar sin hacer zoom-out del navegador. Confirmado explícitamente fuera de alcance de este spec; queda anotado como punto de partida para un spec futuro de responsive/UI que ajuste el CSS del contenedor `crt`/`crt-screen` para encajar el canvas (p. ej. escalar con `max-width: 100%`/`aspect-ratio` manteniendo la resolución interna 800×600).
