@@ -1,6 +1,6 @@
 # 06 — Leaderboard y tabla de juegos en Supabase (Asteroids)
 
-**Estado:** Aprobado
+**Estado:** Implementado
 **Depende de:** 04-integracion-supabase (clientes de Supabase ya configurados), 05-asteroids-motor-real (engine real que produce el puntaje final a persistir)
 **Fecha:** 2026-07-15
 **Objetivo:** Crear las tablas `games` y `scores` en Supabase y conectar el flujo real de Asteroids (detalle, partida y salón de la fama) a datos persistidos de verdad, dejando el resto del catálogo funcionando exactamente igual con los datos mock existentes.
@@ -118,20 +118,20 @@
 
 ## Criterios de aceptación
 
-- [ ] Las tablas `games` y `scores` existen en Supabase con las columnas del modelo de datos, incluyendo `created_at` en ambas, `user_id` (nullable) en `scores`, y la FK `scores.game_id` → `games.id`.
-- [ ] La tabla `games` contiene exactamente una fila (`id: "asteroids"`) sembrada por la migración, con el mismo contenido que la entrada `asteroids` de `app/data/games.ts`.
-- [ ] `app/lib/supabase/queries.ts` exporta `getAsteroidsGame`, `getAsteroidsScores` y `getAsteroidsStats`, todas funciones async sobre el cliente de servidor. `app/lib/supabase/actions.ts` exporta `saveAsteroidsScore` como Server Action (`'use server'` a nivel de archivo), invocable desde el Client Component de la partida.
-- [ ] `getAsteroidsScores` devuelve `ScoreRow[]` ordenado por `score` descendente, con `rank` calculado por posición y `date` derivado de `created_at` en formato `DD/MM/AAAA`.
-- [ ] `getAsteroidsStats` devuelve `best` (`MAX(score)`, 0 si `scores` está vacía para asteroids) y `plays` (`COUNT(*)` de filas de asteroids en `scores`).
-- [ ] En `/game/asteroids`, el título, descripción, leaderboard lateral, "Mejor global" y "Partidas" provienen de Supabase (no de `app/data/games.ts` ni `seededScores()`).
-- [ ] El resto de páginas de detalle (`/game/<otro-id>`) sigue usando `app/data/games.ts` y `seededScores()` sin cambios ni regresiones.
-- [ ] En `/game/asteroids/play`, al presionar "GUARDAR PUNTUACIÓN" se inserta una fila real en `scores` (`game_id: "asteroids"`, `player_name`, `score`, `user_id: null`), y `saved` pasa a `true` solo si el insert resuelve correctamente.
-- [ ] Si el insert falla, se muestra un mensaje de error breve en el modal, el botón "GUARDAR PUNTUACIÓN" permanece disponible para reintentar, y "JUGAR DE NUEVO"/"VOLVER AL VAULT" siguen funcionando sin bloqueo.
-- [ ] El guardado simulado del resto de juegos (`id !== "asteroids"`) no cambia de comportamiento.
-- [ ] En `/hall-of-fame`, la pestaña "ASTEROIDS" muestra las puntuaciones reales de `scores` (recalculadas al cargar la página), y el resto de pestañas sigue mostrando `seededScores()` sin cambios.
-- [ ] Jugar una partida completa de Asteroids, guardar la puntuación, y recargar `/game/asteroids` y `/hall-of-fame` refleja esa puntuación nueva en ambas pantallas.
-- [ ] `Podium.tsx` y `Leaderboard.tsx` no se modifican — siguen consumiendo `ScoreRow[]` sin cambios de props ni de forma.
-- [ ] `npm run build` compila sin errores de TypeScript ni de ESLint.
+- [x] Las tablas `games` y `scores` existen en Supabase con las columnas del modelo de datos, incluyendo `created_at` en ambas, `user_id` (nullable) en `scores`, y la FK `scores.game_id` → `games.id`.
+- [x] La tabla `games` contiene exactamente una fila (`id: "asteroids"`) sembrada por la migración, con el mismo contenido que la entrada `asteroids` de `app/data/games.ts`.
+- [x] `app/lib/supabase/queries.ts` exporta `getAsteroidsGame`, `getAsteroidsScores` y `getAsteroidsStats`, todas funciones async sobre el cliente de servidor. `app/lib/supabase/actions.ts` exporta `saveAsteroidsScore` como Server Action (`'use server'` a nivel de archivo), invocable desde el Client Component de la partida.
+- [x] `getAsteroidsScores` devuelve `ScoreRow[]` ordenado por `score` descendente, con `rank` calculado por posición y `date` derivado de `created_at` en formato `DD/MM/AAAA`.
+- [x] `getAsteroidsStats` devuelve `best` (`MAX(score)`, 0 si `scores` está vacía para asteroids) y `plays` (`COUNT(*)` de filas de asteroids en `scores`).
+- [x] En `/game/asteroids`, el título, descripción, leaderboard lateral, "Mejor global" y "Partidas" provienen de Supabase (no de `app/data/games.ts` ni `seededScores()`).
+- [x] El resto de páginas de detalle (`/game/<otro-id>`) sigue usando `app/data/games.ts` y `seededScores()` sin cambios ni regresiones.
+- [x] En `/game/asteroids/play`, al presionar "GUARDAR PUNTUACIÓN" se inserta una fila real en `scores` (`game_id: "asteroids"`, `player_name`, `score`, `user_id: null`), y `saved` pasa a `true` solo si el insert resuelve correctamente.
+- [x] Si el insert falla, se muestra un mensaje de error breve en el modal, el botón "GUARDAR PUNTUACIÓN" permanece disponible para reintentar, y "JUGAR DE NUEVO"/"VOLVER AL VAULT" siguen funcionando sin bloqueo.
+- [x] El guardado simulado del resto de juegos (`id !== "asteroids"`) no cambia de comportamiento.
+- [x] En `/hall-of-fame`, la pestaña "ASTEROIDS" muestra las puntuaciones reales de `scores` (recalculadas al cargar la página), y el resto de pestañas sigue mostrando `seededScores()` sin cambios.
+- [x] Jugar una partida completa de Asteroids, guardar la puntuación, y recargar `/game/asteroids` y `/hall-of-fame` refleja esa puntuación nueva en ambas pantallas.
+- [x] `Podium.tsx` y `Leaderboard.tsx` no se modifican — siguen consumiendo `ScoreRow[]` sin cambios de props ni de forma.
+- [x] `npm run build` compila sin errores de TypeScript ni de ESLint.
 
 ## Decisiones tomadas y descartadas
 
