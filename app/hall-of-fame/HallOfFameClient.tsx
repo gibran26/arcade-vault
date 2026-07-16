@@ -43,7 +43,16 @@ export default function HallOfFameClient({
         ))}
       </div>
 
-      <Podium rows={rows} />
+      {rows.length >= 3 ? (
+        <Podium rows={rows} />
+      ) : (
+        <p
+          className="mono"
+          style={{ textAlign: 'center', color: 'var(--ink-dim)' }}
+        >
+          AÚN NO HAY SUFICIENTES PUNTUACIONES PARA EL PODIO
+        </p>
+      )}
 
       <div className="hall-table">
         <div className="th">
