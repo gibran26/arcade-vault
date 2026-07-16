@@ -101,23 +101,23 @@ Esta funcionalidad no introduce nuevas tablas ni persistencia — solo estructur
 
 ## Criterios de aceptación
 
-- [ ] `app/data/games.ts` incluye una entrada con `id: "asteroids"`, `cat: "SHOOTER"`, `cover: "cover-rocas"`, `color: "yellow"`, visible en `/games` y en `/game/asteroids`.
-- [ ] `app/game-engines/asteroids/engine.ts` existe, exporta `createGame(canvas, callbacks)` y no usa variables globales de módulo (toda la lógica del `game.js` original queda encapsulada dentro del closure de `createGame`).
-- [ ] `AsteroidsCallbacks` incluye `onScoreChange`, `onLivesChange`, `onGameOver`, `onPauseChange` (obligatorios) y `onLevelChange` (opcional).
-- [ ] En `/game/asteroids/play` el juego se renderiza dentro de un `<canvas>` de 800×600 y es jugable con teclado: `←`/`→` rotan la nave, `↑` propulsa, `Espacio` dispara.
-- [ ] El envolvimiento toroidal de bordes y el split de asteroides (grande → mediano → pequeño) funcionan igual que en el juego original.
-- [ ] El power-up de disparo triple (`PowerUp`, `ship.tripleShot`) funciona igual que en el juego original: los asteroides lo sueltan ocasionalmente al destruirse, la nave dispara 3 balas mientras está activo, y su indicador `3x Ns` se sigue mostrando dentro del canvas.
-- [ ] El HUD interno del canvas (`SCORE`, `NIVEL`, iconos de vidas, overlay `GAME OVER`) se sigue dibujando exactamente igual que en `game.js` original, sin quitar ni agregar elementos.
-- [ ] El HUD de React muestra el puntaje real del juego (actualizado vía `onScoreChange`), no valores aleatorios — visible en paralelo al HUD interno del canvas, no en su reemplazo.
-- [ ] El HUD de React muestra las vidas reales del juego (actualizadas vía `onLivesChange`), no valores simulados — visible en paralelo al HUD interno del canvas, no en su reemplazo.
-- [ ] En estado `gameover`, presionar `Espacio` NO reinicia el engine internamente (a diferencia del `game.js` original); el único reinicio posible es vía el botón "JUGAR DE NUEVO" de React.
-- [ ] El campo "Nivel" del HUD se muestra fijo en `01` para este juego; `onLevelChange` está declarado en el tipo pero nunca es invocado por el engine de Asteroids.
-- [ ] El botón "PAUSA" detiene el `requestAnimationFrame` real del engine (la nave/asteroides dejan de moverse), y "REANUDAR" lo reactiva; el estado visual de pausa del HUD se sincroniza con `onPauseChange(isPaused)`.
-- [ ] Al llegar a 0 vidas, el engine invoca `onLivesChange(0)` seguido de `onGameOver(finalScore)`, y React muestra automáticamente el modal "FIN DEL JUEGO" con el puntaje final recibido (sin inferir el fin de juego por otro medio).
-- [ ] Al presionar "JUGAR DE NUEVO", el engine se destruye y se vuelve a crear desde cero: nave, asteroides, puntaje (0) y vidas (3) quedan en su estado inicial.
-- [ ] Salir de la partida (botón "SALIR" o navegación fuera de la página) limpia correctamente el engine (`destroy()` se llama en el cleanup del `useEffect`, sin loops ni listeners de teclado colgando).
-- [ ] Los demás juegos del catálogo (`id !== "asteroids"`) conservan exactamente el comportamiento simulado actual, sin regresiones.
-- [ ] `npm run build` compila sin errores de TypeScript ni de ESLint.
+- [x] `app/data/games.ts` incluye una entrada con `id: "asteroids"`, `cat: "SHOOTER"`, `cover: "cover-rocas"`, `color: "yellow"`, visible en `/games` y en `/game/asteroids`.
+- [x] `app/game-engines/asteroids/engine.ts` existe, exporta `createGame(canvas, callbacks)` y no usa variables globales de módulo (toda la lógica del `game.js` original queda encapsulada dentro del closure de `createGame`).
+- [x] `AsteroidsCallbacks` incluye `onScoreChange`, `onLivesChange`, `onGameOver`, `onPauseChange` (obligatorios) y `onLevelChange` (opcional).
+- [x] En `/game/asteroids/play` el juego se renderiza dentro de un `<canvas>` de 800×600 y es jugable con teclado: `←`/`→` rotan la nave, `↑` propulsa, `Espacio` dispara.
+- [x] El envolvimiento toroidal de bordes y el split de asteroides (grande → mediano → pequeño) funcionan igual que en el juego original.
+- [x] El power-up de disparo triple (`PowerUp`, `ship.tripleShot`) funciona igual que en el juego original: los asteroides lo sueltan ocasionalmente al destruirse, la nave dispara 3 balas mientras está activo, y su indicador `3x Ns` se sigue mostrando dentro del canvas.
+- [x] El HUD interno del canvas (`SCORE`, `NIVEL`, iconos de vidas, overlay `GAME OVER`) se sigue dibujando exactamente igual que en `game.js` original, sin quitar ni agregar elementos.
+- [x] El HUD de React muestra el puntaje real del juego (actualizado vía `onScoreChange`), no valores aleatorios — visible en paralelo al HUD interno del canvas, no en su reemplazo.
+- [x] El HUD de React muestra las vidas reales del juego (actualizadas vía `onLivesChange`), no valores simulados — visible en paralelo al HUD interno del canvas, no en su reemplazo.
+- [x] En estado `gameover`, presionar `Espacio` NO reinicia el engine internamente (a diferencia del `game.js` original); el único reinicio posible es vía el botón "JUGAR DE NUEVO" de React.
+- [x] El campo "Nivel" del HUD se muestra fijo en `01` para este juego; `onLevelChange` está declarado en el tipo pero nunca es invocado por el engine de Asteroids.
+- [x] El botón "PAUSA" detiene el `requestAnimationFrame` real del engine (la nave/asteroides dejan de moverse), y "REANUDAR" lo reactiva; el estado visual de pausa del HUD se sincroniza con `onPauseChange(isPaused)`.
+- [x] Al llegar a 0 vidas, el engine invoca `onLivesChange(0)` seguido de `onGameOver(finalScore)`, y React muestra automáticamente el modal "FIN DEL JUEGO" con el puntaje final recibido (sin inferir el fin de juego por otro medio).
+- [x] Al presionar "JUGAR DE NUEVO", el engine se destruye y se vuelve a crear desde cero: nave, asteroides, puntaje (0) y vidas (3) quedan en su estado inicial.
+- [x] Salir de la partida (botón "SALIR" o navegación fuera de la página) limpia correctamente el engine (`destroy()` se llama en el cleanup del `useEffect`, sin loops ni listeners de teclado colgando).
+- [x] Los demás juegos del catálogo (`id !== "asteroids"`) conservan exactamente el comportamiento simulado actual, sin regresiones.
+- [x] `npm run build` compila sin errores de TypeScript ni de ESLint.
 
 ## Decisiones tomadas y descartadas
 
