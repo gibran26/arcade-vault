@@ -64,20 +64,3 @@ export async function getAsteroidsStats(): Promise<{
   const best = (data ?? []).reduce((max, row) => Math.max(max, row.score), 0);
   return { best, plays: count ?? 0 };
 }
-
-export async function saveAsteroidsScore(
-  playerName: string,
-  score: number,
-): Promise<void> {
-  const supabase = await createClient();
-  const { error } = await supabase
-    .from('scores')
-    .insert({
-      game_id: 'asteroids',
-      player_name: playerName,
-      score,
-      user_id: null,
-    });
-
-  if (error) throw error;
-}

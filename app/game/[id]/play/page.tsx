@@ -8,6 +8,7 @@ import {
   createGame,
   type AsteroidsGame,
 } from '@/app/game-engines/asteroids/engine';
+import { saveAsteroidsScore } from '@/app/lib/supabase/actions';
 
 export default function GamePlayerPage({
   params,
@@ -27,6 +28,8 @@ export default function GamePlayerPage({
   const [over, setOver] = useState(false);
   const [name, setName] = useState(user ? user.name : 'INVITADO');
   const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const engineRef = useRef<AsteroidsGame | null>(null);
@@ -65,7 +68,6 @@ export default function GamePlayerPage({
       engineRef.current?.destroy();
       engineRef.current = null;
     };
-     
   }, [isAsteroids]);
 
   const togglePause = () => {
@@ -88,6 +90,25 @@ export default function GamePlayerPage({
     setPaused(false);
     setOver(false);
     setSaved(false);
+    setSaving(false);
+    setSaveError(null);
+  };
+
+  const handleSaveScore = async () => {
+    if (!isAsteroids) {
+      setSaved(true);
+      return;
+    }
+    setSaving(true);
+    setSaveError(null);
+    try {
+      await saveAsteroidsScore(name, score);
+      setSaved(true);
+    } catch {
+      setSaveError('No se pudo guardar la puntuación. Intenta de nuevo.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   if (!game) notFound();
@@ -190,9 +211,21 @@ export default function GamePlayerPage({
                   }
                   placeholder="TUS INICIALES"
                 />
-                <button className="btn yellow" onClick={() => setSaved(true)}>
-                  GUARDAR PUNTUACIÓN
+                <button
+                  className="btn yellow"
+                  onClick={handleSaveScore}
+                  disabled={saving}
+                >
+                  {saving ? 'GUARDANDO...' : 'GUARDAR PUNTUACIÓN'}
                 </button>
+                {saveError && (
+                  <div
+                    className="toast-error"
+                    style={{ color: 'var(--magenta)' }}
+                  >
+                    ▸ {saveError}
+                  </div>
+                )}
               </div>
             ) : (
               <div className="toast-saved">▸ PUNTUACIÓN GUARDADA_</div>

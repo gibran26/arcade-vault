@@ -12,7 +12,8 @@
 - **Tabla `games` en Supabase**: nueva tabla con una única fila sembrada para `asteroids` (id, title, short, long, cat, cover, color — mismos campos de contenido que la entrada `asteroids` ya existente en `app/data/games.ts`). Sirve como referencia (FK) para `scores.game_id`, no reemplaza el catálogo mock.
 - **Tabla `scores` en Supabase**: nueva tabla para puntuaciones reales, con `game_id` referenciando `games.id`, `player_name`, `score`, `user_id` (nullable, sin relación a Supabase Auth todavía — reservado para un spec futuro de auth real) y `created_at`.
 - **Migración de Supabase** (vía MCP `apply_migration`) que crea ambas tablas e inserta la fila semilla de `asteroids` en `games`.
-- **`app/lib/supabase/queries.ts`** (nuevo módulo): funciones para leer la fila de `asteroids` desde `games`, leer/ordenar las filas de `scores` de `asteroids` (mapeadas a `ScoreRow[]`, con `rank` y `date` calculados al leer, no almacenados), calcular `best` (`MAX(score)`) y `plays` (`COUNT(*)`) en vivo, e insertar una fila nueva en `scores`.
+- **`app/lib/supabase/queries.ts`** (nuevo módulo, solo lectura, usado desde Server Components): funciones para leer la fila de `asteroids` desde `games`, leer/ordenar las filas de `scores` de `asteroids` (mapeadas a `ScoreRow[]`, con `rank` y `date` calculados al leer, no almacenados), y calcular `best` (`MAX(score)`) y `plays` (`COUNT(*)`) en vivo.
+- **`app/lib/supabase/actions.ts`** (nuevo módulo, archivo con `'use server'` en la primera línea): Server Action que inserta una fila nueva en `scores`, invocable desde el Client Component de la partida (`app/game/[id]/play/page.tsx`). Se separa de `queries.ts` porque Next.js no permite anotar Server Actions inline dentro de un módulo que también es importado por un Client Component sin forzar que todo ese módulo (incluido el cliente de servidor con `next/headers`) se empaquete para el navegador.
 - **`app/game/[id]/page.tsx`**: cuando `id === "asteroids"`, la página deja de usar `GAMES.find(...)` y `seededScores(...)` y en su lugar consulta Supabase (fila de `games`, filas de `scores`, `best`/`plays` calculados). Para el resto de juegos, el comportamiento actual con el mock no cambia.
 - **`app/game/[id]/play/page.tsx`**: el botón "GUARDAR PUNTUACIÓN" para Asteroids ejecuta un insert real en `scores` (con `user_id: null` mientras no exista auth real) en vez de solo marcar `saved = true` localmente. Si el insert falla, se muestra un mensaje de error breve en el modal y el botón queda disponible para reintentar; el flujo de "JUGAR DE NUEVO"/"VOLVER AL VAULT" no se bloquea.
 - **`app/hall-of-fame/page.tsx`**: la pestaña "ASTEROIDS" consulta las filas reales de `scores` (ordenadas por puntaje) en vez de `seededScores()`. El resto de pestañas (otros juegos) sigue usando `seededScores()` sin cambios.
@@ -87,7 +88,11 @@
     plays: number;
   }>;
   // best = MAX(score) (0 si no hay filas), plays = COUNT(*).
+  ```
 
+  **`app/lib/supabase/actions.ts`** (nuevo módulo, `'use server'` a nivel de archivo):
+
+  ```ts
   export async function saveAsteroidsScore(
     playerName: string,
     score: number,
@@ -115,7 +120,7 @@
 
 - [ ] Las tablas `games` y `scores` existen en Supabase con las columnas del modelo de datos, incluyendo `created_at` en ambas, `user_id` (nullable) en `scores`, y la FK `scores.game_id` → `games.id`.
 - [ ] La tabla `games` contiene exactamente una fila (`id: "asteroids"`) sembrada por la migración, con el mismo contenido que la entrada `asteroids` de `app/data/games.ts`.
-- [ ] `app/lib/supabase/queries.ts` exporta `getAsteroidsGame`, `getAsteroidsScores`, `getAsteroidsStats` y `saveAsteroidsScore`, todas funciones async sobre el cliente de servidor.
+- [ ] `app/lib/supabase/queries.ts` exporta `getAsteroidsGame`, `getAsteroidsScores` y `getAsteroidsStats`, todas funciones async sobre el cliente de servidor. `app/lib/supabase/actions.ts` exporta `saveAsteroidsScore` como Server Action (`'use server'` a nivel de archivo), invocable desde el Client Component de la partida.
 - [ ] `getAsteroidsScores` devuelve `ScoreRow[]` ordenado por `score` descendente, con `rank` calculado por posición y `date` derivado de `created_at` en formato `DD/MM/AAAA`.
 - [ ] `getAsteroidsStats` devuelve `best` (`MAX(score)`, 0 si `scores` está vacía para asteroids) y `plays` (`COUNT(*)` de filas de asteroids en `scores`).
 - [ ] En `/game/asteroids`, el título, descripción, leaderboard lateral, "Mejor global" y "Partidas" provienen de Supabase (no de `app/data/games.ts` ni `seededScores()`).
@@ -141,6 +146,7 @@
 - **`player_name` como texto libre, sin relación a usuario real**, igual que el campo "TUS INICIALES" que ya existe hoy en el modal de fin de juego — no se fuerza login para guardar una puntuación.
 - **Diseño de políticas RLS explícitamente fuera de alcance** de este spec — las tablas se crean sin que este spec defina sus políticas de acceso; se abordará en un spec futuro dedicado a seguridad de datos. Decisión explícita del usuario.
 - **Manejo de errores en el guardado**: mensaje de error breve con reintento habilitado, en vez de fallar silenciosamente marcando `saved = true` de todas formas, porque el usuario prefiere que el jugador sepa si su puntuación no se persistió realmente. Decisión explícita del usuario.
+- **`saveAsteroidsScore` vive en `app/lib/supabase/actions.ts` (archivo separado con `'use server'`), no en `queries.ts`**, ajuste hecho durante la Fase 4 de este spec sobre la propuesta inicial de tener las 4 funciones en un mismo módulo. Next.js no permite anotar Server Actions inline dentro de un módulo que un Client Component también importa (forzaría empaquetar `next/headers` para el navegador), y separar lecturas (`queries.ts`, solo Server Components) de la mutación (`actions.ts`, Server Action invocable desde cliente) es además el patrón idiomático de Next.js App Router. Decisión explícita del usuario, priorizando el diseño correcto sobre cumplir el texto original al pie de la letra.
 - **`Podium.tsx`/`Leaderboard.tsx` sin cambios**, porque las funciones nuevas de `queries.ts` producen el mismo shape `ScoreRow[]` que `seededScores()` ya produce — no hay necesidad de tocar los componentes de presentación.
 - **Supabase Auth real fuera de alcance**, manteniendo `app/context/auth-context.tsx` con `localStorage` exactamente como hoy — `user_id` queda declarado en el esquema pero siempre `null` en este spec.
 
