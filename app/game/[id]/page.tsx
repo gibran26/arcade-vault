@@ -1,8 +1,13 @@
-import { notFound } from "next/navigation";
-import Link from "next/link";
-import { GAMES } from "@/app/data/games";
-import { seededScores } from "@/app/data/players";
-import Leaderboard from "@/components/Leaderboard";
+import { notFound } from 'next/navigation';
+import Link from 'next/link';
+import { GAMES } from '@/app/data/games';
+import { seededScores } from '@/app/data/players';
+import Leaderboard from '@/components/Leaderboard';
+import {
+  getAsteroidsGame,
+  getAsteroidsScores,
+  getAsteroidsStats,
+} from '@/app/lib/supabase/queries';
 
 export default async function GameDetailPage({
   params,
@@ -10,6 +15,77 @@ export default async function GameDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+
+  if (id === 'asteroids') {
+    const asteroidsGame = await getAsteroidsGame();
+    if (!asteroidsGame) notFound();
+
+    const scores = await getAsteroidsScores(10);
+    const stats = await getAsteroidsStats();
+
+    return (
+      <div className="av-detail fade-in">
+        <div>
+          <div className="detail-cover">
+            <div className={'cover-bg ' + asteroidsGame.cover}></div>
+          </div>
+          <div style={{ marginTop: 20 }} className="detail-info">
+            <div className="detail-tags">
+              <span>{asteroidsGame.cat}</span>
+              <span>1 JUGADOR</span>
+              <span>TECLADO / TÁCTIL</span>
+              <span>RETRO 1985</span>
+            </div>
+            <h2 className="neon-cyan">{asteroidsGame.title}</h2>
+            <p>{asteroidsGame.long}</p>
+            <div className="stat-strip">
+              <div>
+                <div className="l">Partidas</div>
+                <div className="v">{stats.plays}</div>
+              </div>
+              <div>
+                <div className="l">Mejor global</div>
+                <div
+                  className="v"
+                  style={{
+                    color: 'var(--magenta)',
+                    textShadow: '0 0 6px rgba(255,0,110,0.5)',
+                  }}
+                >
+                  {stats.best.toLocaleString('es-ES')}
+                </div>
+              </div>
+              <div>
+                <div className="l">Dificultad</div>
+                <div
+                  className="v"
+                  style={{
+                    color: 'var(--yellow)',
+                    textShadow: '0 0 6px rgba(245,255,0,0.5)',
+                  }}
+                >
+                  ★ ★ ★ ☆ ☆
+                </div>
+              </div>
+            </div>
+            <div className="detail-actions">
+              <Link href={`/game/asteroids/play`} className="btn xl pulse">
+                ▶ JUGAR AHORA
+              </Link>
+              <Link href="/games" className="btn ghost lg">
+                VOLVER AL VAULT
+              </Link>
+            </div>
+          </div>
+        </div>
+
+        <aside>
+          <Leaderboard scores={scores} />
+        </aside>
+      </div>
+    );
+  }
+
   const game = GAMES.find((g) => g.id === id);
   if (!game) notFound();
 
@@ -19,7 +95,7 @@ export default async function GameDetailPage({
     <div className="av-detail fade-in">
       <div>
         <div className="detail-cover">
-          <div className={"cover-bg " + game.cover}></div>
+          <div className={'cover-bg ' + game.cover}></div>
         </div>
         <div style={{ marginTop: 20 }} className="detail-info">
           <div className="detail-tags">
@@ -39,16 +115,22 @@ export default async function GameDetailPage({
               <div className="l">Mejor global</div>
               <div
                 className="v"
-                style={{ color: "var(--magenta)", textShadow: "0 0 6px rgba(255,0,110,0.5)" }}
+                style={{
+                  color: 'var(--magenta)',
+                  textShadow: '0 0 6px rgba(255,0,110,0.5)',
+                }}
               >
-                {game.best.toLocaleString("es-ES")}
+                {game.best.toLocaleString('es-ES')}
               </div>
             </div>
             <div>
               <div className="l">Dificultad</div>
               <div
                 className="v"
-                style={{ color: "var(--yellow)", textShadow: "0 0 6px rgba(245,255,0,0.5)" }}
+                style={{
+                  color: 'var(--yellow)',
+                  textShadow: '0 0 6px rgba(245,255,0,0.5)',
+                }}
               >
                 ★ ★ ★ ☆ ☆
               </div>
