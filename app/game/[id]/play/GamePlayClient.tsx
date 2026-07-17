@@ -56,9 +56,6 @@ export default function GamePlayClient({ game }: { game: Game }) {
   const restart = () => {
     engineRef.current?.destroy();
     startEngine();
-    setScore(0);
-    setLives(3);
-    setLevel(1);
     setPaused(false);
     setOver(false);
     setSaved(false);

@@ -335,6 +335,8 @@ export function createGame(
   }
 
   function drawPanel() {
+    ctx.fillStyle = '#0a0a0f';
+    ctx.fillRect(PANEL_X, 0, PANEL_W, CANVAS_H);
     ctx.fillStyle = 'rgba(255,255,255,0.03)';
     ctx.fillRect(PANEL_X, 0, PANEL_W, CANVAS_H);
     ctx.strokeStyle = 'rgba(255,255,255,0.15)';
@@ -433,9 +435,20 @@ export function createGame(
     rafId = requestAnimationFrame(loop);
   }
 
+  const CAPTURED_KEYS = new Set([
+    'ArrowLeft',
+    'ArrowRight',
+    'ArrowUp',
+    'ArrowDown',
+    'Space',
+    'KeyX',
+    'KeyP',
+  ]);
+
   function handleKeyDown(e: KeyboardEvent) {
+    if (CAPTURED_KEYS.has(e.code)) e.preventDefault();
+
     if (e.code === 'KeyP') {
-      e.preventDefault();
       setPaused(!paused);
       return;
     }
@@ -456,7 +469,6 @@ export function createGame(
         tryRotate();
         break;
       case 'Space':
-        e.preventDefault();
         hardDrop();
         break;
       default:
