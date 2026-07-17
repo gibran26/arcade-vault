@@ -1,19 +1,16 @@
-import { GAMES } from '@/app/data/games';
-import { seededScores } from '@/app/data/players';
-import { getAsteroidsScores } from '@/app/lib/supabase/queries';
 import type { ScoreRow } from '@/app/data/types';
+import { getGames, getScores } from '@/app/lib/supabase/queries';
 import HallOfFameClient from './HallOfFameClient';
 
 export default async function HallOfFamePage() {
-  const asteroidsScores = await getAsteroidsScores(12);
+  const games = await getGames();
 
   const scoresByGame: Record<string, ScoreRow[]> = {};
-  for (const g of GAMES) {
-    scoresByGame[g.id] =
-      g.id === 'asteroids'
-        ? asteroidsScores
-        : seededScores(g.id.length * 23 + 7, 12);
-  }
+  await Promise.all(
+    games.map(async (g) => {
+      scoresByGame[g.id] = await getScores(g.id, 12);
+    }),
+  );
 
-  return <HallOfFameClient games={GAMES} scoresByGame={scoresByGame} />;
+  return <HallOfFameClient games={games} scoresByGame={scoresByGame} />;
 }
