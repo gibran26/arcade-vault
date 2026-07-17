@@ -101,5 +101,3 @@ export const GAMES: Game[] = [
     plays: '0',
   },
 ];
-
-export const CATS = ['TODOS', 'ARCADE', 'PUZZLE', 'SHOOTER', 'VERSUS'] as const;

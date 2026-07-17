@@ -1,4 +1,4 @@
-export type GameCategory = "ARCADE" | "PUZZLE" | "SHOOTER" | "VERSUS";
+export type GameCategory = 'ARCADE' | 'PUZZLE' | 'SHOOTER' | 'VERSUS';
 
 export interface Game {
   id: string;
@@ -7,7 +7,7 @@ export interface Game {
   long: string;
   cat: GameCategory;
   cover: string; // clase CSS del gradiente (ej. "cover-bricks")
-  color: "cyan" | "magenta" | "yellow" | "green";
+  color: 'cyan' | 'magenta' | 'yellow' | 'green';
   best: number;
   plays: string; // ej. "12.4K"
 }
@@ -22,3 +22,5 @@ export interface ScoreRow {
 export interface User {
   name: string;
 }
+
+export const CATS = ['TODOS', 'ARCADE', 'PUZZLE', 'SHOOTER', 'VERSUS'] as const;
