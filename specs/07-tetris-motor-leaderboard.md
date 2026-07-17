@@ -1,6 +1,6 @@
 # 07 — Juego Tetris (motor real + leaderboard)
 
-**Estado:** Aprobado
+**Estado:** Implementado
 **Depende de:** 04-integracion-supabase (clientes de Supabase ya configurados); generaliza y reemplaza el uso literal de "asteroids" en 05-asteroids-motor-real y 06-leaderboard-scores-supabase
 **Fecha:** 2026-07-17
 **Objetivo:** Portar el motor real de Tetris (references/started-games/03-tetris/game.js) a un módulo TypeScript que se ejecute dentro de un `<canvas>` en /game/tetris/play, notificando a React los cambios de puntaje, vidas y nivel para alimentar el HUD existente, agregar su entrada al catálogo, y generalizar la capa de Supabase (`games`/`scores`) de funciones literales de Asteroids a funciones parametrizadas por `gameId` que ambos juegos consuman.
@@ -180,29 +180,29 @@
 
 ## Criterios de aceptación
 
-- [ ] La tabla `games` de Supabase contiene exactamente dos filas (`"asteroids"`, `"tetris"`) al cierre de este spec; la fila `"tetris"` fue insertada por la migración de este spec con el mismo contenido definido en el Modelo de datos.
-- [ ] `app/lib/supabase/queries.ts` exporta `getGames()`, `getGame(gameId)`, `getScores(gameId, limit?)` y `getStats(gameId)` — ninguna contiene el literal `"asteroids"` ni `"tetris"` hardcodeado en su lógica. `app/lib/supabase/actions.ts` exporta `saveScore(gameId, playerName, score)`.
-- [ ] `app/game-engines/tetris/engine.ts` existe, exporta `createGame(canvas, callbacks)` y no usa variables globales de módulo.
-- [ ] `TetrisCallbacks` incluye `onScoreChange`, `onLivesChange`, `onGameOver`, `onPauseChange`, `onLevelChange` (todos obligatorios).
-- [ ] `app/game-engines/registry.ts` existe y exporta un mapa `gameId → { createGame, width, height }` con entradas para `asteroids` (800×600) y `tetris` (480×600).
-- [ ] En `/game/tetris/play`, el juego se renderiza dentro de un `<canvas>` de 480×600 y es jugable con teclado: `←`/`→` mueven, `↑`/`X` rotan (con wall kicks), `↓` hace soft drop, `Espacio` hace hard drop.
-- [ ] El HUD interno del canvas de Tetris (SCORE/LINES/LEVEL/vista previa NEXT) se dibuja dentro del mismo canvas, igual que en `game.js` original, sin quitar ni agregar elementos.
-- [ ] El HUD de React (Jugador/Puntuación/Vidas/Nivel) refleja datos reales de Tetris: `Vidas` muestra 1 mientras la partida está en curso y 0 al terminar; `Nivel` refleja el nivel real.
-- [ ] El botón "PAUSA" del HUD de React y la tecla `P` capturada por el engine pausan/reanudan el `requestAnimationFrame` real de Tetris; ambos caminos sincronizan el estado visual de pausa vía `onPauseChange`.
-- [ ] Al no caber una pieza nueva al generarse, el engine invoca `onLivesChange(0)` seguido de `onGameOver(finalScore)`, y React muestra el modal "FIN DEL JUEGO" con el puntaje final.
-- [ ] Al presionar "JUGAR DE NUEVO" en Tetris, el engine se destruye y se vuelve a crear desde cero: tablero, puntaje, líneas y nivel quedan en su estado inicial.
-- [ ] `app/game/[id]/play/page.tsx` no contiene ninguna condicional `if (id === "asteroids")`/`if (id === "tetris")` ni la simulación decorativa (`game-arena`, `enemy`, `player-ship`, `setInterval` de puntaje aleatorio) — el motor se resuelve exclusivamente vía `GAME_ENGINES[id]`.
-- [ ] "GUARDAR PUNTUACIÓN" en Tetris inserta una fila real en `scores` (`game_id: "tetris"`) vía `saveScore`; si falla, muestra el mismo mensaje de error con reintento ya existente para Asteroids.
-- [ ] `app/game/[id]/page.tsx` tiene una sola rama que usa `getGame`/`getScores`/`getStats` para cualquier `id`; visitar `/game/tetris` y `/game/asteroids` muestra datos reales; visitar un `id` que no existe en Supabase da 404.
-- [ ] `/games` (biblioteca) lista únicamente los juegos devueltos por `getGames()` (Asteroids, Tetris); la búsqueda y el filtro por categoría siguen funcionando.
-- [ ] La sección "JUEGOS DISPONIBLES AHORA" del Home lista únicamente los juegos devueltos por `getGames()`; el resto de secciones del Home (hero, features, stats, actividad, pricing) no tiene regresiones.
-- [ ] `/hall-of-fame` muestra únicamente pestañas para los juegos devueltos por `getGames()` (Asteroids, Tetris), cada una con puntuaciones reales vía `getScores(gameId, 12)`.
-- [ ] Ningún archivo bajo `app/` o `components/` importa `app/data/games.ts` (`GAMES`) ni `app/data/players.ts` (`seededScores`); ambos archivos permanecen en el repo sin eliminarse.
-- [ ] `CATS` se exporta desde `app/data/types.ts` (ya no desde `app/data/games.ts`).
-- [ ] Jugar una partida completa de Tetris, guardar la puntuación, y recargar `/game/tetris` y `/hall-of-fame` refleja esa puntuación nueva en ambas pantallas.
-- [ ] Jugar una partida completa de Asteroids sigue funcionando end-to-end sin regresiones tras la generalización de la capa de Supabase y del registro de motores.
-- [ ] `Podium.tsx`, `Leaderboard.tsx`, `GameCard.tsx` y `MiniCard` no se modifican — siguen consumiendo los mismos tipos (`ScoreRow[]`, `Game`) sin cambios de props ni de forma.
-- [ ] `npm run build` compila sin errores de TypeScript ni de ESLint.
+- [x] La tabla `games` de Supabase contiene exactamente dos filas (`"asteroids"`, `"tetris"`) al cierre de este spec; la fila `"tetris"` fue insertada por la migración de este spec con el mismo contenido definido en el Modelo de datos.
+- [x] `app/lib/supabase/queries.ts` exporta `getGames()`, `getGame(gameId)`, `getScores(gameId, limit?)` y `getStats(gameId)` — ninguna contiene el literal `"asteroids"` ni `"tetris"` hardcodeado en su lógica. `app/lib/supabase/actions.ts` exporta `saveScore(gameId, playerName, score)`.
+- [x] `app/game-engines/tetris/engine.ts` existe, exporta `createGame(canvas, callbacks)` y no usa variables globales de módulo.
+- [x] `TetrisCallbacks` incluye `onScoreChange`, `onLivesChange`, `onGameOver`, `onPauseChange`, `onLevelChange` (todos obligatorios).
+- [x] `app/game-engines/registry.ts` existe y exporta un mapa `gameId → { createGame, width, height }` con entradas para `asteroids` (800×600) y `tetris` (480×600).
+- [x] En `/game/tetris/play`, el juego se renderiza dentro de un `<canvas>` de 480×600 y es jugable con teclado: `←`/`→` mueven, `↑`/`X` rotan (con wall kicks), `↓` hace soft drop, `Espacio` hace hard drop.
+- [x] El HUD interno del canvas de Tetris (SCORE/LINES/LEVEL/vista previa NEXT) se dibuja dentro del mismo canvas, igual que en `game.js` original, sin quitar ni agregar elementos.
+- [x] El HUD de React (Jugador/Puntuación/Vidas/Nivel) refleja datos reales de Tetris: `Vidas` muestra 1 mientras la partida está en curso y 0 al terminar; `Nivel` refleja el nivel real.
+- [x] El botón "PAUSA" del HUD de React y la tecla `P` capturada por el engine pausan/reanudan el `requestAnimationFrame` real de Tetris; ambos caminos sincronizan el estado visual de pausa vía `onPauseChange`.
+- [x] Al no caber una pieza nueva al generarse, el engine invoca `onLivesChange(0)` seguido de `onGameOver(finalScore)`, y React muestra el modal "FIN DEL JUEGO" con el puntaje final.
+- [x] Al presionar "JUGAR DE NUEVO" en Tetris, el engine se destruye y se vuelve a crear desde cero: tablero, puntaje, líneas y nivel quedan en su estado inicial.
+- [x] `app/game/[id]/play/page.tsx` no contiene ninguna condicional `if (id === "asteroids")`/`if (id === "tetris")` ni la simulación decorativa (`game-arena`, `enemy`, `player-ship`, `setInterval` de puntaje aleatorio) — el motor se resuelve exclusivamente vía `GAME_ENGINES[id]`.
+- [x] "GUARDAR PUNTUACIÓN" en Tetris inserta una fila real en `scores` (`game_id: "tetris"`) vía `saveScore`; si falla, muestra el mismo mensaje de error con reintento ya existente para Asteroids.
+- [x] `app/game/[id]/page.tsx` tiene una sola rama que usa `getGame`/`getScores`/`getStats` para cualquier `id`; visitar `/game/tetris` y `/game/asteroids` muestra datos reales; visitar un `id` que no existe en Supabase da 404.
+- [x] `/games` (biblioteca) lista únicamente los juegos devueltos por `getGames()` (Asteroids, Tetris); la búsqueda y el filtro por categoría siguen funcionando.
+- [x] La sección "JUEGOS DISPONIBLES AHORA" del Home lista únicamente los juegos devueltos por `getGames()`; el resto de secciones del Home (hero, features, stats, actividad, pricing) no tiene regresiones.
+- [x] `/hall-of-fame` muestra únicamente pestañas para los juegos devueltos por `getGames()` (Asteroids, Tetris), cada una con puntuaciones reales vía `getScores(gameId, 12)`.
+- [x] Ningún archivo bajo `app/` o `components/` importa `app/data/games.ts` (`GAMES`) ni `app/data/players.ts` (`seededScores`); ambos archivos permanecen en el repo sin eliminarse.
+- [x] `CATS` se exporta desde `app/data/types.ts` (ya no desde `app/data/games.ts`).
+- [x] Jugar una partida completa de Tetris, guardar la puntuación, y recargar `/game/tetris` y `/hall-of-fame` refleja esa puntuación nueva en ambas pantallas.
+- [x] Jugar una partida completa de Asteroids sigue funcionando end-to-end sin regresiones tras la generalización de la capa de Supabase y del registro de motores.
+- [x] `Podium.tsx`, `Leaderboard.tsx`, `GameCard.tsx` y `MiniCard` no se modifican — siguen consumiendo los mismos tipos (`ScoreRow[]`, `Game`) sin cambios de props ni de forma.
+- [x] `npm run build` compila sin errores de TypeScript ni de ESLint.
 
 ## Decisiones tomadas y descartadas
 
