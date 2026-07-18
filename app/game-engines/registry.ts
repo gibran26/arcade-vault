@@ -1,3 +1,4 @@
+import { createGame as arkanoidCreateGame } from './arkanoid/engine';
 import { createGame as asteroidsCreateGame } from './asteroids/engine';
 import { createGame as tetrisCreateGame } from './tetris/engine';
 
@@ -27,4 +28,5 @@ interface EngineEntry {
 export const GAME_ENGINES: Record<string, EngineEntry> = {
   asteroids: { createGame: asteroidsCreateGame, width: 800, height: 600 },
   tetris: { createGame: tetrisCreateGame, width: 480, height: 600 },
+  arkanoid: { createGame: arkanoidCreateGame, width: 800, height: 600 },
 };
