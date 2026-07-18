@@ -1,6 +1,6 @@
 # 08 — Integración de Arkanoid (motor + leaderboard)
 
-**Estado:** Aprobado
+**Estado:** Implementado
 **Depende de:** 04-integracion-supabase (clientes de Supabase); consume la capa ya generalizada por 07-tetris-motor-leaderboard (`getGames`/`getGame`/`getScores`/`getStats`/`saveScore`, `GAME_ENGINES`) sin volver a generalizar nada.
 **Fecha:** 2026-07-17
 **Objetivo:** Portar el motor real de Arkanoid (`references/started-games/04-arkanoid/game.js`) a un módulo TypeScript que se ejecute dentro de un `<canvas>` en `/game/arkanoid/play` — con control por mouse y teclado, sprites y sonido —, notificando a React los cambios de puntaje, vidas y nivel, agregar su entrada al catálogo (`games` de Supabase y `GAME_ENGINES`), y persistir sus puntuaciones vía la capa de datos genérica ya existente.
@@ -110,26 +110,26 @@
 
 ## Criterios de aceptación
 
-- [ ] `public/assets/arkanoid/` contiene `spritesheet-breakout.png`, `ball-bounce.mp3` y `break-sound.mp3`, accesibles vía HTTP.
-- [ ] `app/game-engines/arkanoid/engine.ts` existe, exporta `createGame(canvas, callbacks)` y no usa variables globales de módulo.
-- [ ] `ArkanoidCallbacks` incluye `onScoreChange`, `onLivesChange`, `onGameOver`, `onPauseChange`, `onLevelChange` (todos obligatorios).
-- [ ] En `/game/arkanoid/play`, el juego se renderiza dentro de un `<canvas>` de 800×600 y es jugable: la paleta se mueve con mouse y con `←`/`→`, los bloques se rompen con colisión AABB (animación de explosión + sonido), y la pelota rebota en paredes/paleta con sonido.
-- [ ] Los 5 niveles cargan en orden con velocidad creciente, igual que en `levels.js` original; `onLevelChange` refleja el nivel real en el HUD de React.
-- [ ] El HUD interno del canvas (Score/Nivel/iconos de vidas, overlay `GAME OVER`, overlay `¡Completaste el juego!`, overlay de pausa con selector de nivel 1–5) se dibuja igual que en `game.js` original, sin quitar ni agregar elementos.
-- [ ] El botón "PAUSA" de React y las teclas `P`/`Escape` capturadas por el engine pausan/reanudan el mismo `requestAnimationFrame` real; ambos caminos sincronizan el estado visual de pausa vía `onPauseChange`.
-- [ ] Durante la pausa, hacer clic en uno de los botones 1–5 del overlay interno salta a ese nivel (tablero, pelota y velocidad se reinician al del nivel elegido).
-- [ ] Al perder las 3 vidas, el engine invoca `onLivesChange(0)` seguido de `onGameOver(finalScore)`, y React muestra el modal "FIN DEL JUEGO" con el puntaje final.
-- [ ] Al completar el nivel 5 (`gameState === 'win'`), el engine invoca `onGameOver(finalScore)` también, mostrando el mismo modal "FIN DEL JUEGO" con el puntaje final acumulado.
-- [ ] `onGameOver` se invoca como máximo una vez por partida, sin importar cuántas colisiones/eventos ocurran después de llegar al estado final (derrota o victoria).
-- [ ] Al presionar "JUGAR DE NUEVO", el engine se destruye y se vuelve a crear desde cero: paddle, pelota, bloques del nivel 1, puntaje (0) y vidas (3) quedan en su estado inicial.
-- [ ] Salir de la partida (botón "SALIR" o navegación fuera de la página) limpia correctamente el engine (`destroy()` remueve listeners de `mousemove`/`click`/teclado sin dejar ninguno colgando).
-- [ ] `app/game-engines/registry.ts` incluye la entrada `arkanoid: { createGame, width: 800, height: 600 }`.
-- [ ] La tabla `games` de Supabase contiene la fila `"arkanoid"` sembrada por la migración de este spec, con el contenido definido en el Modelo de datos.
-- [ ] "GUARDAR PUNTUACIÓN" en Arkanoid inserta una fila real en `scores` (`game_id: "arkanoid"`) vía `saveScore`, sin cambios de código en `actions.ts`; si falla, muestra el mismo mensaje de error con reintento ya existente para los otros juegos.
-- [ ] `/game/arkanoid`, `/games`, `/` y `/hall-of-fame` (pestaña "ARKANOID") muestran datos reales de Arkanoid sin ningún cambio de código en esas páginas, más allá de la fila sembrada en `games` y la entrada en `GAME_ENGINES`.
-- [ ] La entrada mock `"bloque-buster"` ya no existe en el array `GAMES` de `app/data/games.ts` (el archivo se conserva, no se elimina).
-- [ ] Asteroids y Tetris siguen funcionando end-to-end sin regresiones.
-- [ ] `npm run build` compila sin errores de TypeScript ni de ESLint.
+- [x] `public/assets/arkanoid/` contiene `spritesheet-breakout.png`, `ball-bounce.mp3` y `break-sound.mp3`, accesibles vía HTTP.
+- [x] `app/game-engines/arkanoid/engine.ts` existe, exporta `createGame(canvas, callbacks)` y no usa variables globales de módulo.
+- [x] `ArkanoidCallbacks` incluye `onScoreChange`, `onLivesChange`, `onGameOver`, `onPauseChange`, `onLevelChange` (todos obligatorios).
+- [x] En `/game/arkanoid/play`, el juego se renderiza dentro de un `<canvas>` de 800×600 y es jugable: la paleta se mueve con mouse y con `←`/`→`, los bloques se rompen con colisión AABB (animación de explosión + sonido), y la pelota rebota en paredes/paleta con sonido.
+- [x] Los 5 niveles cargan en orden con velocidad creciente, igual que en `levels.js` original; `onLevelChange` refleja el nivel real en el HUD de React.
+- [x] El HUD interno del canvas (Score/Nivel/iconos de vidas, overlay `GAME OVER`, overlay `¡Completaste el juego!`, overlay de pausa con selector de nivel 1–5) se dibuja igual que en `game.js` original, sin quitar ni agregar elementos.
+- [x] El botón "PAUSA" de React y las teclas `P`/`Escape` capturadas por el engine pausan/reanudan el mismo `requestAnimationFrame` real; ambos caminos sincronizan el estado visual de pausa vía `onPauseChange`.
+- [x] Durante la pausa, hacer clic en uno de los botones 1–5 del overlay interno salta a ese nivel (tablero, pelota y velocidad se reinician al del nivel elegido).
+- [x] Al perder las 3 vidas, el engine invoca `onLivesChange(0)` seguido de `onGameOver(finalScore)`, y React muestra el modal "FIN DEL JUEGO" con el puntaje final.
+- [x] Al completar el nivel 5 (`gameState === 'win'`), el engine invoca `onGameOver(finalScore)` también, mostrando el mismo modal "FIN DEL JUEGO" con el puntaje final acumulado.
+- [x] `onGameOver` se invoca como máximo una vez por partida, sin importar cuántas colisiones/eventos ocurran después de llegar al estado final (derrota o victoria).
+- [x] Al presionar "JUGAR DE NUEVO", el engine se destruye y se vuelve a crear desde cero: paddle, pelota, bloques del nivel 1, puntaje (0) y vidas (3) quedan en su estado inicial.
+- [x] Salir de la partida (botón "SALIR" o navegación fuera de la página) limpia correctamente el engine (`destroy()` remueve listeners de `mousemove`/`click`/teclado sin dejar ninguno colgando).
+- [x] `app/game-engines/registry.ts` incluye la entrada `arkanoid: { createGame, width: 800, height: 600 }`.
+- [x] La tabla `games` de Supabase contiene la fila `"arkanoid"` sembrada por la migración de este spec, con el contenido definido en el Modelo de datos.
+- [x] "GUARDAR PUNTUACIÓN" en Arkanoid inserta una fila real en `scores` (`game_id: "arkanoid"`) vía `saveScore`, sin cambios de código en `actions.ts`; si falla, muestra el mismo mensaje de error con reintento ya existente para los otros juegos.
+- [x] `/game/arkanoid`, `/games`, `/` y `/hall-of-fame` (pestaña "ARKANOID") muestran datos reales de Arkanoid sin ningún cambio de código en esas páginas, más allá de la fila sembrada en `games` y la entrada en `GAME_ENGINES`.
+- [x] La entrada mock `"bloque-buster"` ya no existe en el array `GAMES` de `app/data/games.ts` (el archivo se conserva, no se elimina).
+- [x] Asteroids y Tetris siguen funcionando end-to-end sin regresiones.
+- [x] `npm run build` compila sin errores de TypeScript ni de ESLint.
 
 ## Decisiones tomadas y descartadas
 
