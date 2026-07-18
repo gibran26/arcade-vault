@@ -254,6 +254,7 @@ export function createGame(
 
   let lastTime: number | null = null;
   let rafId: number | null = null;
+  let destroyed = false;
 
   function loadSpritesheet(cb: () => void) {
     const rawImg = new Image();
@@ -622,6 +623,7 @@ export function createGame(
   callbacks.onLivesChange(lives);
 
   loadSpritesheet(() => {
+    if (destroyed) return;
     initPaddle();
     loadLevel(1);
     rafId = requestAnimationFrame(loop);
@@ -635,6 +637,7 @@ export function createGame(
       setPaused(false);
     },
     destroy() {
+      destroyed = true;
       if (rafId !== null) cancelAnimationFrame(rafId);
       rafId = null;
       canvas.removeEventListener('click', handleClick);
