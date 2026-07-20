@@ -1,5 +1,6 @@
 import { createGame as arkanoidCreateGame } from './arkanoid/engine';
 import { createGame as asteroidsCreateGame } from './asteroids/engine';
+import { createGame as snakeCreateGame } from './snake/engine';
 import { createGame as tetrisCreateGame } from './tetris/engine';
 
 export interface EngineCallbacks {
@@ -29,4 +30,5 @@ export const GAME_ENGINES: Record<string, EngineEntry> = {
   asteroids: { createGame: asteroidsCreateGame, width: 800, height: 600 },
   tetris: { createGame: tetrisCreateGame, width: 480, height: 600 },
   arkanoid: { createGame: arkanoidCreateGame, width: 800, height: 600 },
+  snake: { createGame: snakeCreateGame, width: 600, height: 600 },
 };
