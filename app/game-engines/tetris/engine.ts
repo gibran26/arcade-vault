@@ -96,7 +96,7 @@ export function createGame(
   canvas.height = CANVAS_H;
   const ctx = canvas.getContext('2d')!;
 
-  let board: number[][];
+  const board: number[][] = createBoard();
   let current: Piece;
   let next: Piece;
   let score = 0;
@@ -446,6 +446,14 @@ export function createGame(
   ]);
 
   function handleKeyDown(e: KeyboardEvent) {
+    const target = e.target as HTMLElement | null;
+    if (
+      target &&
+      (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')
+    ) {
+      return;
+    }
+
     if (CAPTURED_KEYS.has(e.code)) e.preventDefault();
 
     if (e.code === 'KeyP') {
@@ -479,7 +487,6 @@ export function createGame(
 
   window.addEventListener('keydown', handleKeyDown);
 
-  board = createBoard();
   score = 0;
   lines = 0;
   level = 1;
