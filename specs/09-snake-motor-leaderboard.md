@@ -1,6 +1,6 @@
 # 09 — Integración de Snake (motor + leaderboard)
 
-**Estado:** Aprobado
+**Estado:** Implementado
 **Depende de:** 04-integracion-supabase (clientes de Supabase); consume la capa ya generalizada por 07-tetris-motor-leaderboard (`getGames`/`getGame`/`getScores`/`getStats`/`saveScore`, `GAME_ENGINES`) sin volver a generalizar nada.
 **Fecha:** 2026-07-20
 **Objetivo:** Construir desde cero el motor de Snake (sin código fuente de referencia, solo assets visuales de frutas en `references/source-assets/snake-assets/`) como módulo TypeScript que se ejecute dentro de un `<canvas>` en `/game/snake/play` — movimiento por grilla, frutas con sprites, velocidad creciente —, notificando a React los cambios de puntaje, vidas y nivel, agregar su entrada al catálogo (`games` de Supabase y `GAME_ENGINES`), y persistir sus puntuaciones vía la capa de datos genérica ya existente.
@@ -111,27 +111,27 @@
 
 ## Criterios de aceptación
 
-- [ ] La tabla `games` de Supabase contiene una fila `id: "snake"`, `title: "SNAKE"`, `cat: "ARCADE"`, `cover: "cover-snake"`, `color: "green"`, sembrada por la migración.
-- [ ] `public/assets/snake/fruits.png` existe y es servido por la app; `app/game-engines/snake/engine.ts` referencia la imagen con ruta absoluta (`/assets/snake/fruits.png`).
-- [ ] `app/game-engines/snake/engine.ts` existe, exporta `createGame(canvas, callbacks)` y no usa variables globales de módulo (grilla, serpiente, fruta, score, nivel, estado de pausa y listeners quedan encapsulados dentro del closure de `createGame`).
-- [ ] `SnakeCallbacks` incluye `onScoreChange`, `onLivesChange`, `onGameOver`, `onPauseChange`, `onLevelChange`, todos obligatorios, compatibles con `EngineCallbacks` de `registry.ts`.
-- [ ] En `/game/snake/play` el juego se renderiza dentro de un `<canvas>` de 600×600 y es jugable con teclado: `←`/`→`/`↑`/`↓` y `WASD` controlan la dirección de la serpiente, sin reversa instantánea sobre el segundo segmento.
-- [ ] El borde del canvas muestra un marco de paredes claramente distinguible de la grilla jugable.
-- [ ] Comer una fruta hace crecer la serpiente en un segmento, suma 10 puntos, y genera una nueva fruta en una celda libre con un sprite aleatorio entre los 22 de `FRUIT_SPRITES`.
-- [ ] Cada 5 frutas comidas (50 puntos), el nivel sube en 1 y la velocidad de movimiento de la serpiente aumenta (~10% de reducción del intervalo del tick).
-- [ ] Chocar contra cualquier pared del borde, o contra el propio cuerpo, termina la partida de inmediato (sin wrap-around toroidal).
-- [ ] El canvas no dibuja ningún HUD interno propio (score/vidas/nivel) — el HUD de React es la única fuente visual de esos datos durante la partida.
-- [ ] `onLivesChange` se invoca exactamente con `1` al iniciar la partida y con `0` en el instante de la colisión letal, inmediatamente seguido de `onGameOver(finalScore)`.
-- [ ] El botón "PAUSA" del HUD de React detiene el loop de tick real (la serpiente deja de moverse), y "REANUDAR" lo reactiva; las teclas `P`/`Escape` capturadas por el engine producen el mismo efecto; ambos caminos confirman el estado vía `onPauseChange(isPaused)`.
-- [ ] Al llegar a la colisión letal, React muestra automáticamente el modal "FIN DEL JUEGO" con el puntaje final recibido vía `onGameOver`.
-- [ ] Al presionar "JUGAR DE NUEVO", el engine se destruye y se vuelve a crear desde cero: serpiente, fruta, puntaje (0), nivel (1) y velocidad quedan en su estado inicial.
-- [ ] Salir de la partida (botón "SALIR" o navegación fuera de la página) limpia correctamente el engine (`destroy()` se llama en el cleanup del `useEffect`, sin loops ni listeners de teclado colgando).
-- [ ] `app/game-engines/registry.ts` incluye la entrada `snake: { createGame, width: 600, height: 600 }`, sin modificar `app/game/[id]/play/page.tsx` ni `GamePlayClient.tsx`.
-- [ ] En `/game/snake/play`, guardar la puntuación inserta una fila real en `scores` (`game_id: "snake"`) vía `saveScore`, reutilizando la Server Action ya existente sin cambios.
-- [ ] En `/game/snake`, el título, descripción, leaderboard lateral, "Mejor global" y "Partidas" provienen de Supabase vía `getGame`/`getScores`/`getStats`, sin cambios en esas funciones.
-- [ ] En `/hall-of-fame`, la pestaña "SNAKE" muestra las puntuaciones reales de `scores` para `game_id: "snake"`.
-- [ ] El resto del catálogo (`asteroids`, `tetris`, `arkanoid`, y los juegos mock restantes) conserva exactamente su comportamiento actual, sin regresiones.
-- [ ] `npm run build` compila sin errores de TypeScript ni de ESLint.
+- [x] La tabla `games` de Supabase contiene una fila `id: "snake"`, `title: "SNAKE"`, `cat: "ARCADE"`, `cover: "cover-snake"`, `color: "green"`, sembrada por la migración.
+- [x] `public/assets/snake/fruits.png` existe y es servido por la app; `app/game-engines/snake/engine.ts` referencia la imagen con ruta absoluta (`/assets/snake/fruits.png`).
+- [x] `app/game-engines/snake/engine.ts` existe, exporta `createGame(canvas, callbacks)` y no usa variables globales de módulo (grilla, serpiente, fruta, score, nivel, estado de pausa y listeners quedan encapsulados dentro del closure de `createGame`).
+- [x] `SnakeCallbacks` incluye `onScoreChange`, `onLivesChange`, `onGameOver`, `onPauseChange`, `onLevelChange`, todos obligatorios, compatibles con `EngineCallbacks` de `registry.ts`.
+- [x] En `/game/snake/play` el juego se renderiza dentro de un `<canvas>` de 600×600 y es jugable con teclado: `←`/`→`/`↑`/`↓` y `WASD` controlan la dirección de la serpiente, sin reversa instantánea sobre el segundo segmento.
+- [x] El borde del canvas muestra un marco de paredes claramente distinguible de la grilla jugable.
+- [x] Comer una fruta hace crecer la serpiente en un segmento, suma 10 puntos, y genera una nueva fruta en una celda libre con un sprite aleatorio entre los 22 de `FRUIT_SPRITES`.
+- [x] Cada 5 frutas comidas (50 puntos), el nivel sube en 1 y la velocidad de movimiento de la serpiente aumenta (~10% de reducción del intervalo del tick).
+- [x] Chocar contra cualquier pared del borde, o contra el propio cuerpo, termina la partida de inmediato (sin wrap-around toroidal).
+- [x] El canvas no dibuja ningún HUD interno propio (score/vidas/nivel) — el HUD de React es la única fuente visual de esos datos durante la partida.
+- [x] `onLivesChange` se invoca exactamente con `1` al iniciar la partida y con `0` en el instante de la colisión letal, inmediatamente seguido de `onGameOver(finalScore)`.
+- [x] El botón "PAUSA" del HUD de React detiene el loop de tick real (la serpiente deja de moverse), y "REANUDAR" lo reactiva; las teclas `P`/`Escape` capturadas por el engine producen el mismo efecto; ambos caminos confirman el estado vía `onPauseChange(isPaused)`.
+- [x] Al llegar a la colisión letal, React muestra automáticamente el modal "FIN DEL JUEGO" con el puntaje final recibido vía `onGameOver`.
+- [x] Al presionar "JUGAR DE NUEVO", el engine se destruye y se vuelve a crear desde cero: serpiente, fruta, puntaje (0), nivel (1) y velocidad quedan en su estado inicial.
+- [x] Salir de la partida (botón "SALIR" o navegación fuera de la página) limpia correctamente el engine (`destroy()` se llama en el cleanup del `useEffect`, sin loops ni listeners de teclado colgando).
+- [x] `app/game-engines/registry.ts` incluye la entrada `snake: { createGame, width: 600, height: 600 }`, sin modificar `app/game/[id]/play/page.tsx` ni `GamePlayClient.tsx`.
+- [x] En `/game/snake/play`, guardar la puntuación inserta una fila real en `scores` (`game_id: "snake"`) vía `saveScore`, reutilizando la Server Action ya existente sin cambios.
+- [x] En `/game/snake`, el título, descripción, leaderboard lateral, "Mejor global" y "Partidas" provienen de Supabase vía `getGame`/`getScores`/`getStats`, sin cambios en esas funciones.
+- [x] En `/hall-of-fame`, la pestaña "SNAKE" muestra las puntuaciones reales de `scores` para `game_id: "snake"`.
+- [x] El resto del catálogo (`asteroids`, `tetris`, `arkanoid`, y los juegos mock restantes) conserva exactamente su comportamiento actual, sin regresiones.
+- [x] `npm run build` compila sin errores de TypeScript ni de ESLint.
 
 ## Decisiones tomadas y descartadas
 
