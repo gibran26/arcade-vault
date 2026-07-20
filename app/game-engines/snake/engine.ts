@@ -87,6 +87,7 @@ export function createGame(
   let gameState: GameState = 'playing';
   let tickIntervalMs = BASE_TICK_MS;
   let tickAccumulator = 0;
+  let isPaused = false;
 
   const fruitImage = new Image();
   let fruitImageLoaded = false;
@@ -257,7 +258,7 @@ export function createGame(
     const dt = lastTime === null ? 0 : timestamp - lastTime;
     lastTime = timestamp;
 
-    if (gameState === 'playing') {
+    if (gameState === 'playing' && !isPaused) {
       tickAccumulator += dt;
       while (tickAccumulator >= tickIntervalMs) {
         tick();
@@ -268,6 +269,13 @@ export function createGame(
 
     draw();
     rafId = requestAnimationFrame(loop);
+  }
+
+  function setPaused(next: boolean) {
+    if (gameState !== 'playing' || isPaused === next) return;
+    isPaused = next;
+    if (!isPaused) lastTime = null;
+    callbacks.onPauseChange(isPaused);
   }
 
   function requestDirection(next: GridPoint) {
@@ -291,6 +299,11 @@ export function createGame(
     if (dir) {
       e.preventDefault();
       requestDirection(dir);
+      return;
+    }
+    if (e.code === 'KeyP' || e.code === 'Escape') {
+      e.preventDefault();
+      setPaused(!isPaused);
     }
   }
 
@@ -304,9 +317,13 @@ export function createGame(
   rafId = requestAnimationFrame(loop);
 
   return {
-    pause: () => {},
-    resume: () => {},
-    destroy: () => {
+    pause() {
+      setPaused(true);
+    },
+    resume() {
+      setPaused(false);
+    },
+    destroy() {
       destroyed = true;
       if (rafId !== null) cancelAnimationFrame(rafId);
       rafId = null;
