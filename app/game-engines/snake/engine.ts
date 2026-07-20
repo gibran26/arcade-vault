@@ -54,6 +54,9 @@ const CELL_SIZE = CANVAS_SIZE / GRID_SIZE;
 const WALL_INSET = 3;
 const WALL_THICKNESS = 6;
 const BASE_TICK_MS = 150;
+const MIN_TICK_MS = 60;
+const FRUITS_PER_LEVEL = 5;
+const TICK_SPEEDUP_FACTOR = 0.9;
 
 interface GridPoint {
   x: number;
@@ -81,8 +84,10 @@ export function createGame(
   let pendingDirection: GridPoint = direction;
   let fruit: GridPoint & { sprite: string } = { x: 0, y: 0, sprite: 'apple' };
   let score = 0;
+  let level = 1;
+  let fruitsEaten = 0;
   let gameState: GameState = 'playing';
-  const tickIntervalMs = BASE_TICK_MS;
+  let tickIntervalMs = BASE_TICK_MS;
   let tickAccumulator = 0;
 
   const fruitImage = new Image();
@@ -124,6 +129,11 @@ export function createGame(
     ];
     direction = { x: 1, y: 0 };
     pendingDirection = direction;
+    score = 0;
+    level = 1;
+    fruitsEaten = 0;
+    tickIntervalMs = BASE_TICK_MS;
+    gameState = 'playing';
   }
 
   function tick() {
@@ -155,6 +165,14 @@ export function createGame(
     snake.unshift(newHead);
     if (ateFruit) {
       score += 10;
+      fruitsEaten += 1;
+      if (fruitsEaten % FRUITS_PER_LEVEL === 0) {
+        level += 1;
+        tickIntervalMs = Math.max(
+          MIN_TICK_MS,
+          Math.round(tickIntervalMs * TICK_SPEEDUP_FACTOR),
+        );
+      }
       spawnFruit();
     } else {
       snake.pop();
