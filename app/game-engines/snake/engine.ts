@@ -73,8 +73,6 @@ export function createGame(
   canvas: HTMLCanvasElement,
   callbacks: SnakeCallbacks,
 ): SnakeGame {
-  void callbacks;
-
   const ctx = canvas.getContext('2d')!;
   canvas.width = CANVAS_SIZE;
   canvas.height = CANVAS_SIZE;
@@ -100,6 +98,16 @@ export function createGame(
   let lastTime: number | null = null;
   let rafId: number | null = null;
   let destroyed = false;
+
+  function setScore(next: number) {
+    score = next;
+    callbacks.onScoreChange(score);
+  }
+
+  function setLevel(next: number) {
+    level = next;
+    callbacks.onLevelChange(level);
+  }
 
   function occupiedCells(): Set<string> {
     return new Set(snake.map((s) => `${s.x},${s.y}`));
@@ -159,19 +167,21 @@ export function createGame(
 
     if (hitWall || hitSelf) {
       gameState = 'gameover';
+      callbacks.onLivesChange(0);
+      callbacks.onGameOver(score);
       return;
     }
 
     snake.unshift(newHead);
     if (ateFruit) {
-      score += 10;
+      setScore(score + 10);
       fruitsEaten += 1;
       if (fruitsEaten % FRUITS_PER_LEVEL === 0) {
-        level += 1;
         tickIntervalMs = Math.max(
           MIN_TICK_MS,
           Math.round(tickIntervalMs * TICK_SPEEDUP_FACTOR),
         );
+        setLevel(level + 1);
       }
       spawnFruit();
     } else {
@@ -288,6 +298,9 @@ export function createGame(
 
   initSnake();
   spawnFruit();
+  callbacks.onLivesChange(1);
+  callbacks.onLevelChange(level);
+  callbacks.onScoreChange(score);
   rafId = requestAnimationFrame(loop);
 
   return {
