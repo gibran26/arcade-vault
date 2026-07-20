@@ -601,6 +601,14 @@ export function createGame(
   const CAPTURED_KEYS = new Set(['ArrowLeft', 'ArrowRight', 'KeyP', 'Escape']);
 
   function handleKeyDown(e: KeyboardEvent) {
+    const target = e.target as HTMLElement | null;
+    if (
+      target &&
+      (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')
+    ) {
+      return;
+    }
+
     if (CAPTURED_KEYS.has(e.code)) e.preventDefault();
     if (e.code === 'ArrowLeft') keys.ArrowLeft = true;
     if (e.code === 'ArrowRight') keys.ArrowRight = true;

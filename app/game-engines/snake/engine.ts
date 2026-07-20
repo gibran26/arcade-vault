@@ -53,7 +53,7 @@ const GRID_SIZE = 20;
 const CELL_SIZE = CANVAS_SIZE / GRID_SIZE;
 const WALL_INSET = 3;
 const WALL_THICKNESS = 6;
-const BASE_TICK_MS = 150;
+const BASE_TICK_MS = 300;
 const MIN_TICK_MS = 60;
 const FRUITS_PER_LEVEL = 5;
 const TICK_SPEEDUP_FACTOR = 0.9;
@@ -216,15 +216,55 @@ export function createGame(
     }
   }
 
+  function drawEyes(head: GridPoint) {
+    const cx = head.x * CELL_SIZE + CELL_SIZE / 2;
+    const cy = head.y * CELL_SIZE + CELL_SIZE / 2;
+    const offset = 7;
+    const radius = 3;
+    let e1: GridPoint;
+    let e2: GridPoint;
+    if (direction.x === 1) {
+      e1 = { x: cx + offset, y: cy - offset };
+      e2 = { x: cx + offset, y: cy + offset };
+    } else if (direction.x === -1) {
+      e1 = { x: cx - offset, y: cy - offset };
+      e2 = { x: cx - offset, y: cy + offset };
+    } else if (direction.y === -1) {
+      e1 = { x: cx - offset, y: cy - offset };
+      e2 = { x: cx + offset, y: cy - offset };
+    } else {
+      e1 = { x: cx - offset, y: cy + offset };
+      e2 = { x: cx + offset, y: cy + offset };
+    }
+    ctx.fillStyle = '#052e0f';
+    for (const eye of [e1, e2]) {
+      ctx.beginPath();
+      ctx.arc(eye.x, eye.y, radius, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
   function drawSnake() {
     snake.forEach((segment, i) => {
-      ctx.fillStyle = i === 0 ? '#7fff7f' : '#22c55e';
+      const isHead = i === 0;
+      ctx.fillStyle = isHead ? '#baffc9' : '#22c55e';
       ctx.fillRect(
         segment.x * CELL_SIZE + 1,
         segment.y * CELL_SIZE + 1,
         CELL_SIZE - 2,
         CELL_SIZE - 2,
       );
+      if (isHead) {
+        ctx.strokeStyle = '#052e0f';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(
+          segment.x * CELL_SIZE + 2,
+          segment.y * CELL_SIZE + 2,
+          CELL_SIZE - 4,
+          CELL_SIZE - 4,
+        );
+        drawEyes(segment);
+      }
     });
   }
 
@@ -295,6 +335,14 @@ export function createGame(
   };
 
   function handleKeyDown(e: KeyboardEvent) {
+    const target = e.target as HTMLElement | null;
+    if (
+      target &&
+      (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')
+    ) {
+      return;
+    }
+
     const dir = KEY_DIRECTIONS[e.code];
     if (dir) {
       e.preventDefault();
