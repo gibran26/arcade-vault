@@ -41,14 +41,23 @@ deduce del propio prompt de invocación:
 - **Solo (por defecto)** — no se te indica ningún reparto ni rol de worker/consolidador. Es el modo
   de siempre: ejecutas las 4 fases completas, incluida la Fase 4 (grabar memoria).
 - **Worker** — el prompt te asigna explícitamente un rol tipo "eres el worker `i` de `K`", con:
-  - una **partición temática** (una o varias categorías/géneros que te tocan a ti, disjunta de las
-    de los demás workers), y
+  - una **partición temática** (una o varias categorías de `CATS` que te tocan a ti, disjunta de las
+    de los demás workers, **o bien** la partición especial "categorías nuevas" — ver abajo), y
   - una **lista de ids ya reclamados** (juegos ya en memoria + ya asignados a otros workers, para no
     proponerlos tú también).
 
-  En este modo:
+  Si tu partición es una o varias categorías de `CATS`, razonas y propones dentro de ellas; solo
+  flaggeas una categoría nueva si un candidato encaja claramente mejor fuera de `CATS` que dentro.
+
+  Si tu partición es **"categorías nuevas"**, tu mandato es distinto: no te limites a variaciones de
+  `CATS`. Idea géneros ausentes en Arcade Vault (usa `WebSearch`/`WebFetch` sobre clásicos de
+  arcade/retro si hace falta) — p. ej. `PLATFORMER`, `RACING`, `RHYTHM` — y marca cada propuesta con
+  su categoría nueva en la tabla de porción (p. ej. `PLATFORMER (nueva)`). Recuerda en tu salida que
+  integrar cualquiera de estas exige extender `GameCategory`/`CATS` en `app/data/types.ts`.
+
+  En cualquiera de los dos casos:
   1. Haces la Fase 1 igual (lectura de contexto), pero en la Fase 2 solo razonas y propones dentro de
-     tu partición temática, descartando cualquier id de la lista de reclamados.
+     tu partición asignada, descartando cualquier id de la lista de reclamados.
   2. En vez de la Fase 3 completa, devuelves tu porción como una tabla en el mismo formato que la
      memoria (`id | categoría | fuente | razón | fecha`), lista para que el consolidador la integre.
   3. **Nunca ejecutas la Fase 4.** No escribes ni editas `references/game-suggestions-todo.md` en
@@ -61,10 +70,18 @@ deduce del propio prompt de invocación:
 
 ### Guía de particionado (para cuando te toque orquestar tú mismo un lote sin que el usuario ya lo haya repartido)
 
-Si te piden generar tú las particiones para varios workers, repártelas por categorías/géneros
-disjuntos: las de `CATS` (`ARCADE`, `PUZZLE`, `SHOOTER`, `VERSUS`) y, si hace falta más variedad,
-categorías nuevas candidatas (p. ej. `RACING`, `RHYTHM`, `PLATFORMER`). Nunca dejes que dos
-particiones compartan género — así los workers no compiten por los mismos candidatos.
+Si te piden generar tú las particiones para varios workers (`K` workers), la partición
+"categorías nuevas" (fuera de `CATS`, p. ej. `RACING`, `RHYTHM`, `PLATFORMER`) es un slice de
+**primera clase**, no un añadido opcional a las de `CATS`:
+
+- Si `K ≥ 3`, reserva **al menos 1 worker dedicado exclusivamente a categorías nuevas** y reparte
+  las 4 categorías de `CATS` (`ARCADE`, `PUZZLE`, `SHOOTER`, `VERSUS`) entre los `K-1` workers
+  restantes (una o varias categorías por worker).
+- Si `K < 3`, no dediques worker a categorías nuevas; cada worker de `CATS` puede igual flaggear una
+  categoría nueva si el mejor candidato encaja mejor ahí.
+
+Nunca dejes que dos particiones compartan género — así los workers no compiten por los mismos
+candidatos.
 
 ## Fase 1 — Cargar contexto (obligatoria, siempre, antes de proponer)
 

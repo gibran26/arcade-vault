@@ -1,57 +1,52 @@
-# Sugerencias de juegos — game-planner
+# Sugerencias de juegos (game-planner)
 
-To-do de recomendaciones de juegos nuevos para Arcade Vault, organizado por estado.
+To-Do vivo de juegos propuestos para Arcade Vault. Lo mantiene el subagente `game-planner`
+(`.claude/agents/game-planner.md`). No escribe specs ni código — solo registra recomendaciones.
+
+Cada juego vive en una única sección según su estado; al cambiar de estado se mueve su fila
+completa a la sección correspondiente.
 
 ## 🎯 Sugeridos
 
-### ARCADE
-
-| id              | Nombre                     | Fuente     | Justificación                                                                                                                                                                  |
-| --------------- | -------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `cubo-saltarin` | CUBO SALTARÍN (Q\*bert)    | desde cero | Salto isométrico sobre pirámide de cubos que cambian de color. Sin solape con `serpentina`/`gloton`/`ranaria`. Grilla isométrica + colisión simple, score por cubos cambiados. |
-| `excavador`     | EXCAVADOR (Dig Dug)        | desde cero | Excavar túneles y reventar enemigos con bomba de aire o rocas. Introduce terreno destructible, ausente del catálogo.                                                           |
-| `barriles`      | BARRILES (Donkey Kong)     | desde cero | Plataformas con escaleras, saltos y barriles rodantes. Primer platformer puro del catálogo.                                                                                    |
-| `hamburguesero` | HAMBURGUESERO (BurgerTime) | desde cero | Caminar sobre ingredientes en plataformas para dejarlos caer sobre enemigos. Variante de plataformas con objetivo de "construcción".                                           |
-| `minero`        | MINERO (Lode Runner)       | desde cero | Cavar agujeros temporales para atrapar enemigos mientras recolectas oro y escalas. Combina terreno destructible + escalado.                                                    |
-
-### PUZZLE
-
-| id                | Nombre                    | Fuente     | Justificación                                                                                                                                          |
-| ----------------- | ------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `burbujeo`        | BURBUJEO (Puzzle Bobble)  | desde cero | Dispara burbujas en ángulo para formar grupos de 3+ y explotarlas. Grid hexagonal + trayectoria, sin físicas complejas.                                |
-| `pildoras`        | PÍLDORAS (Dr. Mario)      | desde cero | Cápsulas de dos colores caen y hay que alinear 4+ del mismo color para eliminar "virus". Reutiliza patrones de grid+piezas de `tetris`.                |
-| `numerico`        | NUMÉRICO (2048)           | desde cero | Desliza en 4 direcciones para combinar fichas numéricas iguales. Grid fijo 4x4, muy bajo costo de mantenimiento.                                       |
-| `gemas`           | GEMAS (Bejeweled/match-3) | desde cero | Intercambia gemas adyacentes para formar líneas de 3+ con combos en cascada. Introduce intercambio posicional.                                         |
-| `bloques-magicos` | BLOQUES MÁGICOS (Sokoban) | desde cero | Empuja cajas hasta objetivos en un laberinto. Lógica de planificación espacial en vez de reacción rápida; leaderboard menos directo (menor prioridad). |
-
-### SHOOTER
-
-| id                | Nombre                                    | Fuente     | Justificación                                                                                                                           |
-| ----------------- | ----------------------------------------- | ---------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| `galaxia`         | GALAXIA (Galaga)                          | desde cero | Enemigos en formación que descienden en picada individual o grupal, con mecánica de captura de nave. Distinto de `invasores` y `rocas`. |
-| `comando-misiles` | COMANDO DE MISILES (Missile Command)      | desde cero | Disparo de contrafuegos con el mouse para interceptar misiles sobre ciudades. Sub-nicho de "shooter de precisión".                      |
-| `ciempies`        | CIEMPIÉS (Centipede)                      | desde cero | Ciempiés serpenteante que se divide al ser impactado, campo de hongos destructibles.                                                    |
-| `defensor`        | DEFENSOR (Defender)                       | desde cero | Scroll horizontal continuo con disparo + rescate de humanoides. Mecánica de objetivo doble, más ambicioso de portar.                    |
-| `tiro-al-blanco`  | TIRO AL BLANCO (Duck Hunt/Operation Wolf) | desde cero | Shooting gallery de puntería pura con el mouse. El más simple/rápido de implementar, pero menos diferenciado.                           |
-
-### VERSUS
-
-| id                      | Nombre                                         | Fuente     | Justificación                                                                                                                              |
-| ----------------------- | ---------------------------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| `combate-tanques`       | COMBATE DE TANQUES (Combat/Tank)               | desde cero | Dos tanques en arena con obstáculos, proyectiles rebotables. Muy distinto de `duelo-pixel` (Pong).                                         |
-| `esgrima-pixel`         | ESGRIMA PIXEL (duelo de espadachines)          | desde cero | Duelo 1v1 por temporización (atacar/bloquear/esquivar). Subgénero de lucha ausente en el catálogo.                                         |
-| `carrera-reflejos`      | CARRERA DE REFLEJOS (quick draw / splitscreen) | desde cero | Duelo de reacción a dos jugadores en pantalla dividida. Se solapa parcialmente con `ranaria` (menor prioridad).                            |
-| `torre-empuje`          | TORRE DE EMPUJE (sumo simplificado)            | desde cero | Empujar bloques/al rival fuera de una plataforma circular. Física de empuje/fricción algo más compleja de calibrar.                        |
-| `duelo-francotiradores` | DUELO DE FRANCOTIRADORES                       | desde cero | 1v1 con coberturas y munición limitada. Mecánica de apuntado más compleja de balancear; se acerca a `invasores`/`rocas` (menor prioridad). |
+| Juego (id)      | Categoría             | Fuente del motor | Razón de encaje                                                                                                                                                                                                                                                                                 | Fecha      |
+| --------------- | --------------------- | ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
+| flappy-bird     | ARCADE                | desde cero       | Mecánica mínima (1 tecla, gravedad), score = tuberías superadas, muy novedoso, nada de scroll infinito lateral existe hoy                                                                                                                                                                       | 21/07/2026 |
+| bomberman       | ARCADE                | desde cero       | Grilla + bombas + destrucción de bloques, alta rejugabilidad, muy diferenciado, exige IA básica de enemigos                                                                                                                                                                                     | 21/07/2026 |
+| dig-dug         | ARCADE                | desde cero       | Cavar túneles + inflar enemigos, distinto de Pac-Man/Frogger, viable en canvas con grilla                                                                                                                                                                                                       | 21/07/2026 |
+| qbert           | ARCADE                | desde cero       | Salto isométrico sobre cubos, novedoso (perspectiva isométrica ausente), requiere cuidado en mapeo de input                                                                                                                                                                                     | 21/07/2026 |
+| whack-a-mole    | ARCADE                | desde cero       | Motor trivial (clicks sobre topos), leaderboard perfecto y sencillo, el más simple/menos "arcade clásico"                                                                                                                                                                                       | 21/07/2026 |
+| match3-gems     | PUZZLE                | desde cero       | Llena hueco de PUZZLE (única entrada hoy es Tetris/caida), grid+swap portable, score por combos/cascadas                                                                                                                                                                                        | 21/07/2026 |
+| bubble-pop      | PUZZLE                | desde cero       | Puzzle Bobble, apuntar+disparar burbujas, colisión circular simple, único en apuntar con ángulo                                                                                                                                                                                                 | 21/07/2026 |
+| 2048            | PUZZLE                | desde cero       | Grid deslizante de números, trivial de portar, leaderboard perfecto (suma de fichas)                                                                                                                                                                                                            | 21/07/2026 |
+| pipe-dream      | PUZZLE                | desde cero       | Conectar tuberías contrarreloj, grid de tiles + rotar piezas, score por longitud+tiempo                                                                                                                                                                                                         | 21/07/2026 |
+| missile-command | SHOOTER               | desde cero       | Shooter defensivo por puntería, sin solape con invasores/asteroids, score por ciudades salvadas                                                                                                                                                                                                 | 21/07/2026 |
+| centipede       | SHOOTER               | desde cero       | Enemigo segmentado en arena con hongos, distinto de formación fija o fragmentación de rocas                                                                                                                                                                                                     | 21/07/2026 |
+| neon-swarm      | SHOOTER               | desde cero       | Twin-stick shooter arena abierta (Geometry Wars-like), máxima novedad, encaje estético neón, leaderboard con combos                                                                                                                                                                             | 21/07/2026 |
+| light-cycles    | VERSUS                | desde cero       | Único hueco real de VERSUS distinto de Pong: duelo de estelas de luz (Tron), alta novedad. Absorbe el concepto de `tron-lightcycles` (variante 1P) propuesto también por el worker de ARCADE — se consolida aquí como una sola propuesta VERSUS para evitar duplicar el mismo concepto de juego | 21/07/2026 |
+| tank-duel       | VERSUS                | desde cero       | Duelo de tanques con rebote de balas en laberinto (Combat), variante versus distinta a Pong y Tron                                                                                                                                                                                              | 21/07/2026 |
+| air-hockey      | VERSUS                | desde cero       | Físicas de disco con fricción, conceptualmente cercano a Pong pero con mesa 2D y golpeadores, menor novedad que light-cycles/tank-duel pero leaderboard claro                                                                                                                                   | 21/07/2026 |
+| pixel-runner    | RUNNER (nueva)        | desde cero       | Endless runner side-scroll, género ausente en el catálogo, score = distancia/tiempo                                                                                                                                                                                                             | 21/07/2026 |
+| salto-vertical  | PLATFORMER (nueva)    | desde cero       | Doodle Jump-style, física simple, score = altura máxima                                                                                                                                                                                                                                         | 21/07/2026 |
+| turbo-circuito  | RACING (nueva)        | desde cero       | Vista cenital, esquivar tráfico en carriles, score = distancia/autos esquivados                                                                                                                                                                                                                 | 21/07/2026 |
+| ritmo-neon      | RHYTHM (nueva)        | desde cero       | Notas cayendo en carriles, score = precisión/combo; requiere audio sincronizado (mayor riesgo técnico que el resto)                                                                                                                                                                             | 21/07/2026 |
+| torre-neon      | TOWER DEFENSE (nueva) | desde cero       | Pathing + torres + oleadas, mayor complejidad de portar que el resto de la lista, score = oleadas sobrevividas                                                                                                                                                                                  | 21/07/2026 |
 
 ## 👍 Aceptados
 
-_(vacío)_
+| Juego (id) | Categoría | Fuente del motor | Razón de encaje | Fecha |
+| ---------- | --------- | ---------------- | --------------- | ----- |
 
 ## ✅ Implementados
 
-_(vacío — recordatorio: `asteroids`, `tetris`, `arkanoid` y `snake` ya están implementados con motor real y no deben volver a sugerirse)_
+| Juego (id) | Categoría | Fuente del motor | Razón de encaje | Fecha |
+| ---------- | --------- | ---------------- | --------------- | ----- |
 
 ## 🗑️ Rechazados
 
-_(vacío)_
+| Juego (id)     | Categoría           | Fuente del motor | Razón de rechazo                                                                                                                           | Fecha      |
+| -------------- | ------------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | ---------- |
+| minesweeper    | PUZZLE              | desde cero       | Leaderboard problemático: la convención "menor tiempo es mejor" rompe con el resto del catálogo, donde score alto siempre gana             | 21/07/2026 |
+| sokoban        | PUZZLE              | desde cero       | Leaderboard débil: se resuelve por niveles completados, no genera un score numérico continuo y comparable entre partidas                   | 21/07/2026 |
+| mini-golf-neon | SPORTS/GOLF (nueva) | desde cero       | Score invertido (menos golpes es mejor) rompe la convención del leaderboard; además exige física de bola con fricción, mayor riesgo        | 21/07/2026 |
+| columns        | PUZZLE              | desde cero       | Baja novedad: variante de Tetris (bloques de 3 gemas) que solapa demasiado con Tetris, ya implementado                                     | 21/07/2026 |
+| galaga         | SHOOTER             | desde cero       | Se solapa bastante con Space Invaders/Asteroids (formación con clavado en picada); prioridad más baja frente al resto de SHOOTER propuesto | 21/07/2026 |
