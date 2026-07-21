@@ -17,6 +17,10 @@ No hay un runner de tests configurado en este proyecto. La verificación de camb
 - **`/spec-impl`** — implementa un spec ya aprobado (`specs/NN-slug.md`), creando su rama de git.
 - **`/add-game`** — especialización de `/spec` que diseña un spec combinado (motor real en `<canvas>` + leaderboard en Supabase) para integrar un juego nuevo. Tampoco escribe código.
 
+## Agentes
+
+- **`game-planner`** (`.claude/agents/game-planner.md`) — decide qué juego nuevo conviene integrar a Arcade Vault. Analiza el catálogo (`app/data/games.ts`), los juegos ya implementados y los specs en curso, y propone una recomendación ganadora + shortlist justificada, manteniendo su propia memoria en `references/game-suggestions-todo.md`. Solo sugiere: no escribe specs ni código; el siguiente paso siempre es `/add-game <id>`.
+
 ## Stack técnico
 
 - **Framework**: Next.js 16.2.10 con App Router, React 19.2.4.
