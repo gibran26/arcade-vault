@@ -59,7 +59,8 @@ deduce del propio prompt de invocación:
   1. Haces la Fase 1 igual (lectura de contexto), pero en la Fase 2 solo razonas y propones dentro de
      tu partición asignada, descartando cualquier id de la lista de reclamados.
   2. En vez de la Fase 3 completa, devuelves tu porción como una tabla en el mismo formato que la
-     memoria (`id | categoría | fuente | razón | fecha`), lista para que el consolidador la integre.
+     memoria (`id | título | categoría | color | descripción breve | razón | fecha`), lista para
+     que el consolidador la integre.
   3. **Nunca ejecutas la Fase 4.** No escribes ni editas `references/game-suggestions-todo.md` en
      este modo — ver "Reglas duras".
 
@@ -125,6 +126,12 @@ explícitamente estos 5 criterios:
 5. **Disponibilidad de fuente** — ¿hay ya una carpeta en `references/started-games/` que sirva de
    base, o habría que especificar la mecánica desde cero?
 
+Además, para cada candidato define los tres campos con los que luego llenarás su fila en memoria:
+un **título** legible (a partir del `id`), una **descripción breve** (1 línea, mismo estilo que el
+campo `short` del catálogo) y un **color** tomado de la paleta válida del tipo `Game`
+(`app/data/types.ts`: `cyan | magenta | yellow | green`) — nunca inventes un color fuera de esos
+4 valores.
+
 Descarta de plano cualquier candidato que:
 
 - ya esté en `references/implemented-games.md`,
@@ -141,9 +148,10 @@ sobre no escribir memoria. El formato de abajo aplica a los modos Solo y Consoli
 Devuelve siempre este formato, en este orden:
 
 1. **Recomendación ganadora** — un único juego: `id` propuesto (slug en inglés, minúsculas,
-   guiones), título, categoría, fuente del motor (carpeta de `started-games/` o "desde cero"), y un
-   párrafo breve justificando cada uno de los 5 criterios de la Fase 2. Si la categoría es nueva
-   (fuera de `CATS`), dilo explícitamente aquí.
+   guiones), título, categoría, color (uno de `cyan | magenta | yellow | green`), descripción breve
+   (1 línea), y un párrafo breve justificando cada uno de los 5 criterios de la Fase 2 (puedes
+   mencionar ahí la fuente del motor —carpeta de `started-games/` o "desde cero"— como parte de la
+   justificación en prosa). Si la categoría es nueva (fuera de `CATS`), dilo explícitamente aquí.
 2. **Shortlist** — 2 o 3 alternativas ranqueadas (2º, 3º puesto...), una línea de justificación cada
    una, explicando por qué quedaron detrás de la ganadora.
 3. **Siguiente paso** — una línea recordando que la implementación no ocurre aquí: "Para integrarlo,
@@ -181,23 +189,23 @@ Actualiza `references/game-suggestions-todo.md`:
 
   ## 🎯 Sugeridos
 
-  | Juego (id) | Categoría | Fuente del motor | Razón de encaje | Fecha |
-  | ---------- | --------- | ---------------- | --------------- | ----- |
+  | Juego (id) | Título | Categoría | Color | Descripción breve | Razón de encaje | Fecha |
+  | ---------- | ------ | --------- | ----- | ----------------- | --------------- | ----- |
 
   ## 👍 Aceptados
 
-  | Juego (id) | Categoría | Fuente del motor | Razón de encaje | Fecha |
-  | ---------- | --------- | ---------------- | --------------- | ----- |
+  | Juego (id) | Título | Categoría | Color | Descripción breve | Razón de encaje | Fecha |
+  | ---------- | ------ | --------- | ----- | ----------------- | --------------- | ----- |
 
   ## ✅ Implementados
 
-  | Juego (id) | Categoría | Fuente del motor | Razón de encaje | Fecha |
-  | ---------- | --------- | ---------------- | --------------- | ----- |
+  | Juego (id) | Título | Categoría | Color | Descripción breve | Razón de encaje | Fecha |
+  | ---------- | ------ | --------- | ----- | ----------------- | --------------- | ----- |
 
   ## 🗑️ Rechazados
 
-  | Juego (id) | Categoría | Fuente del motor | Razón de rechazo | Fecha |
-  | ---------- | --------- | ---------------- | ---------------- | ----- |
+  | Juego (id) | Título | Categoría | Color | Descripción breve | Razón de rechazo | Fecha |
+  | ---------- | ------ | --------- | ----- | ----------------- | ---------------- | ----- |
   ```
 
 - Añade una fila en **🎯 Sugeridos** por cada juego de tu recomendación ganadora y tu shortlist de
