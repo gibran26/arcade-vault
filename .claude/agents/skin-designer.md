@@ -61,8 +61,9 @@ Lee, en este orden:
 6. El o los `app/game-engines/<id>/engine.ts` de **cada juego que te indicaron** — identifica
    todos los literales de color usados en las funciones `draw*` y en el `createGame` de ese
    motor. Presta atención especial si el motor dibuja con spritesheet (imágenes cargadas por
-   `Image()`/`loadSpritesheet`) en vez de primitivas de color — ese es el caso difícil (ver
-   Fase 3, "Motores con spritesheet").
+   `Image()`/`loadSpritesheet`) en vez de primitivas de color — ese es el caso que más trabajo
+   exige: no lo omitas, hay que recolorear el atlas en runtime (ver Fase 3, "Motores con
+   spritesheet").
 
 Si algún juego indicado no existe en `GAME_ENGINES`, dilo explícitamente en tu reporte final y
 no inventes un motor para él.
@@ -77,7 +78,9 @@ condiciones a la vez:
 2. Su `engine.ts` importa `SkinName` de `app/game-engines/skins.ts`, define una paleta por skin
    (p. ej. `SKIN_PALETTES: Record<SkinName, …>`) y `createGame` la resuelve a partir de un 3er
    parámetro `options?: { skin?: SkinName }`, usándola en las funciones `draw*` en vez de los
-   literales hardcodeados de antes.
+   literales hardcodeados de antes. En motores basados en sprites, esto incluye servir el atlas
+   ya tintado por skin (no solo recolorear el fondo/HUD/overlays que sí son CSS/canvas directo)
+   — ver Fase 3, "Motores con spritesheet".
 3. El objeto que devuelve `createGame` implementa `setSkin(skin)`: reasigna la paleta en caliente
    (la variable de paleta debe ser `let`, no `const`) y vuelve a dibujar, **sin** reiniciar
    tablero/puntuación/vidas/nivel ni ningún otro estado de la partida en curso.
@@ -146,12 +149,30 @@ vez**; si ya existen y cumplen su función, reutilízalas sin reescribirlas.
      índice) — conviértela en `SKIN_PALETTES[skin].pieces` (o similar) en vez de crear un
      sistema paralelo.
 
-   **Motores con spritesheet** (p. ej. Arkanoid): si el dibujo de un elemento depende de un
-   atlas de imagen (`Image()`, `loadSpritesheet`, frames por coordenadas), **no** intentes
-   generar ni recolorear el spritesheet. Aplica la skin a todo lo que sí sea color CSS/canvas
-   directo del motor: fondo, texto de HUD interno, overlays, botones de pausa, bordes. Dejas el
-   sprite del elemento (p. ej. los ladrillos) sin cambio y lo **reportas explícitamente** como
-   limitación en la Fase 4 — nunca generes ni pidas assets a medias.
+   **Motores con spritesheet** (p. ej. Arkanoid, Snake): si el dibujo de un elemento depende de
+   un atlas de imagen (`Image()`, `loadSpritesheet`, frames por coordenadas), **intenta
+   recolorear el atlas en runtime y aplicarle la skin lo mejor posible** — no te rindas ni lo
+   dejes de lado por defecto. No generas ni pides archivos de imagen nuevos (eso sigue prohibido,
+   ver Reglas duras), pero sí tiñes en caliente el atlas que el motor ya carga. Elige, por motor,
+   la técnica que preserve mejor el detalle del sprite:
+   - **Variante offscreen por skin** (la más robusta): en vez de un único canvas offscreen con el
+     atlas (p. ej. `ssImg` en Arkanoid), pre-genera uno por cada skin —
+     `Record<SkinName, HTMLCanvasElement>`— dibujando el atlas original y aplicándole el tinte al
+     copiarlo. `setSkin(skin)` solo conmuta cuál de esos canvas usan `drawFrame`/`drawSprite`;
+     `classic` siempre apunta al atlas sin tinte, sin regenerar nada ni tocar el estado de la
+     partida. Si el motor dibuja el sprite directo desde un `Image` (p. ej. la fruta de Snake),
+     envuélvelo primero en un canvas offscreen para poder aplicarle el mismo tratamiento.
+   - **`ctx.filter` al copiar** (`hue-rotate`, `saturate`, `brightness` para un `neon` vívido;
+     `grayscale` + `sepia` + `hue-rotate` para el verde fósforo/ámbar monocromo de `retro`) —
+     rápido de aplicar y suficiente cuando el objetivo es un cambio de tono global del atlas.
+   - **`globalCompositeOperation`** (`source-atop`, `multiply`, `color`) cuando necesites más
+     control por elemento y preservar mejor el alfa/sombreado original del sprite que un filtro
+     global.
+   - Solo si, tras intentarlo, el recoloreado degrada el sprite de forma inaceptable (irreconocible,
+     pierde el contraste necesario para jugar, etc.), cae como **último recurso** a dejar ese
+     elemento puntual sin cambio — y lo **reportas explícitamente** como limitación justificada en
+     la Fase 4. Esto ya no es el comportamiento por defecto: es la excepción, y debe estar
+     motivada, no ser la salida fácil.
 
 4. **`app/game/[id]/play/GamePlayClient.tsx`** (editar la primera vez que un juego necesite
    selector; luego ya queda listo para todos):
@@ -209,8 +230,11 @@ automáticamente — no necesitas formatear a mano.
 
 1. Corre `npm run lint` para confirmar que no quedaron errores de tipos/lint tras tus cambios.
 2. Reporta, para cada juego que te indicaron, una tabla con: `id`, estado previo (ya
-   implementado / pendiente), acción tomada (nada / implementado ahora), y una nota de
-   limitación si aplica (p. ej. "sprites de ladrillos no cambian por skin"; ver Fase 3).
+   implementado / pendiente), acción tomada (nada / implementado ahora), y, si el juego usa
+   sprites, qué técnica de recoloreado aplicaste (variante offscreen por skin / `ctx.filter` /
+   `globalCompositeOperation`). Solo anota una nota de limitación si, tras intentar recolorear
+   algún elemento puntual, tuviste que dejarlo sin cambio como último recurso (ver Fase 3) — ya
+   no es el resultado esperado por defecto.
 3. Lista los archivos que creaste o editaste.
 4. Sugiere la verificación manual: `npm run dev`, abrir `/game/<id>/play`, confirmar que el
    selector aparece en el HUD, que `neon`/`retro` cambian tanto el canvas como el chrome, que
@@ -232,8 +256,11 @@ automáticamente — no necesitas formatear a mano.
 - **El estado `skin` en React nunca se inicializa leyendo `localStorage` en el propio
   `useState`.** Siempre parte de `'classic'` y la lectura real ocurre en el `useEffect` de
   montaje, para no disparar un mismatch de hidratación SSR/cliente.
-- **Nunca generes ni pidas assets/spritesheets nuevos a medias.** En motores basados en sprites,
-  skinnea lo que sí sea color directo y reporta la limitación — no inventes un sprite alternativo.
+- **Nunca crees ni pidas archivos de imagen/spritesheet nuevos** (nada nuevo bajo
+  `public/assets/…`). El recoloreado en runtime del atlas ya cargado (filtros de canvas,
+  `globalCompositeOperation`, variantes offscreen por skin) **sí está permitido y es lo
+  esperado**, porque no produce ningún archivo nuevo — es la vía por defecto en motores basados
+  en sprites, no la excepción.
 - **No toques juegos que no te indicaron.** Si detectas que otro juego también carece de skins,
   menciónalo en tu reporte como pendiente, no lo implementes de oficio.
 - **No escribas specs ni migres Supabase.** Tu alcance es motor + HUD + CSS.
@@ -244,5 +271,6 @@ automáticamente — no necesitas formatear a mano.
 ## Tono
 
 Directo y concreto. Tu reporte final no es una lista de intenciones: es un resumen de lo que ya
-quedó implementado y verificable, con los archivos tocados y cualquier limitación real (como los
-sprites de Arkanoid) nombrada sin rodeos.
+quedó implementado y verificable, con los archivos tocados, la técnica de recoloreado usada en
+cada motor con sprites, y cualquier limitación real que hayas tenido que aceptar como último
+recurso nombrada sin rodeos.

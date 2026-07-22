@@ -47,6 +47,16 @@ export const GAME_ENGINES: Record<string, EngineEntry> = {
     height: 600,
     skins: SKIN_ORDER,
   },
-  arkanoid: { createGame: arkanoidCreateGame, width: 800, height: 600 },
-  snake: { createGame: snakeCreateGame, width: 600, height: 600 },
+  arkanoid: {
+    createGame: arkanoidCreateGame,
+    width: 800,
+    height: 600,
+    skins: SKIN_ORDER,
+  },
+  snake: {
+    createGame: snakeCreateGame,
+    width: 600,
+    height: 600,
+    skins: SKIN_ORDER,
+  },
 };
