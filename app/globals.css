@@ -1079,6 +1079,86 @@ a {
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
+  align-items: center;
+}
+
+.hud-skins {
+  appearance: none;
+  -webkit-appearance: none;
+  padding: 10px 26px 10px 14px;
+  margin-right: 4px;
+  font-family: var(--pixel);
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  background-color: transparent;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--ink-dim) 50%),
+    linear-gradient(135deg, var(--ink-dim) 50%, transparent 50%);
+  background-position:
+    right 14px top 55%,
+    right 10px top 55%;
+  background-size:
+    5px 5px,
+    5px 5px;
+  background-repeat: no-repeat;
+  border: 1px solid var(--line);
+  color: var(--cyan);
+  text-shadow: 0 0 6px rgba(0, 245, 255, 0.5);
+  cursor: pointer;
+  transition:
+    color 140ms,
+    border-color 140ms;
+}
+.hud-skins:hover {
+  border-color: var(--ink-dim);
+}
+.hud-skins option {
+  background: #0a0a0f;
+  color: var(--ink);
+  font-family: var(--mono);
+}
+
+/* ===== skins visuales del HUD (neon / retro) ===== */
+[data-skin='neon'] .hud-stat .v {
+  color: var(--magenta);
+  text-shadow:
+    0 0 6px rgba(255, 0, 110, 0.7),
+    0 0 16px rgba(0, 245, 255, 0.4);
+}
+[data-skin='neon'] .hud-stat.lives .v {
+  color: var(--cyan);
+  text-shadow:
+    0 0 6px rgba(0, 245, 255, 0.7),
+    0 0 16px rgba(255, 0, 110, 0.4);
+}
+[data-skin='neon'] .hud-stat.level .v {
+  color: #ff00ff;
+  text-shadow:
+    0 0 6px rgba(255, 0, 255, 0.7),
+    0 0 16px rgba(0, 245, 255, 0.4);
+}
+[data-skin='neon'] .hud-skins {
+  color: var(--magenta);
+  border-color: rgba(255, 0, 110, 0.45);
+  text-shadow: 0 0 6px rgba(255, 0, 110, 0.6);
+}
+
+[data-skin='retro'] .hud-stat .v {
+  color: #00ff41;
+  text-shadow: 0 0 6px rgba(0, 255, 65, 0.6);
+}
+[data-skin='retro'] .hud-stat.lives .v {
+  color: #ffb000;
+  text-shadow: 0 0 6px rgba(255, 176, 0, 0.6);
+}
+[data-skin='retro'] .hud-stat.level .v {
+  color: #00ff41;
+  text-shadow: 0 0 6px rgba(0, 255, 65, 0.6);
+}
+[data-skin='retro'] .hud-skins {
+  color: #00ff41;
+  border-color: rgba(255, 176, 0, 0.4);
+  text-shadow: 0 0 6px rgba(0, 255, 65, 0.6);
 }
 
 .crt {

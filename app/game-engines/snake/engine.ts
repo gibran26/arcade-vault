@@ -1,3 +1,5 @@
+import { SKIN_ORDER, type SkinName } from '../skins';
+
 export interface SnakeCallbacks {
   onScoreChange: (score: number) => void;
   onLivesChange: (lives: number) => void;
@@ -6,10 +8,15 @@ export interface SnakeCallbacks {
   onLevelChange: (level: number) => void;
 }
 
+export interface SnakeOptions {
+  skin?: SkinName;
+}
+
 export interface SnakeGame {
   pause: () => void;
   resume: () => void;
   destroy: () => void;
+  setSkin: (skin: SkinName) => void;
 }
 
 interface SpriteRect {
@@ -18,6 +25,63 @@ interface SpriteRect {
   w: number;
   h: number;
 }
+
+interface SnakePalette {
+  bg: string;
+  grid: string;
+  wall: string;
+  headFill: string;
+  bodyFill: string;
+  headStroke: string;
+  eyeFill: string;
+  glow: boolean;
+  glowBlur: number;
+  // Filtro CSS de canvas aplicado al copiar el atlas de frutas al canvas
+  // offscreen de esta skin (ver `buildTintedFruitCanvas`). 'none' para
+  // `classic`, que debe conservar el atlas original sin alterar.
+  fruitFilter: string;
+}
+
+const SKIN_PALETTES: Record<SkinName, SnakePalette> = {
+  classic: {
+    bg: '#000',
+    grid: 'rgba(255, 255, 255, 0.08)',
+    wall: '#0f0',
+    headFill: '#baffc9',
+    bodyFill: '#22c55e',
+    headStroke: '#052e0f',
+    eyeFill: '#052e0f',
+    glow: false,
+    glowBlur: 0,
+    fruitFilter: 'none',
+  },
+  neon: {
+    bg: '#0a0014',
+    grid: 'rgba(0,245,255,0.16)',
+    wall: '#00f5ff',
+    headFill: '#ffffff',
+    bodyFill: '#ff00ff',
+    headStroke: '#1a002a',
+    eyeFill: '#1a002a',
+    glow: true,
+    glowBlur: 14,
+    fruitFilter:
+      'saturate(2.4) hue-rotate(260deg) brightness(1.15) contrast(1.1)',
+  },
+  retro: {
+    bg: '#001100',
+    grid: 'rgba(0,255,65,0.14)',
+    wall: '#ffb000',
+    headFill: '#c8ffd8',
+    bodyFill: '#00ff41',
+    headStroke: '#001a08',
+    eyeFill: '#001a08',
+    glow: true,
+    glowBlur: 6,
+    fruitFilter:
+      'grayscale(1) sepia(1) hue-rotate(70deg) saturate(4) brightness(0.85)',
+  },
+};
 
 // Transcrito de references/source-assets/snake-assets/sprites.js (SPRITE_ATLAS.fruits).
 const FRUIT_SPRITES: Record<string, SpriteRect> = {
@@ -72,10 +136,14 @@ function directionsOpposite(a: GridPoint, b: GridPoint): boolean {
 export function createGame(
   canvas: HTMLCanvasElement,
   callbacks: SnakeCallbacks,
+  options?: SnakeOptions,
 ): SnakeGame {
   const ctx = canvas.getContext('2d')!;
   canvas.width = CANVAS_SIZE;
   canvas.height = CANVAS_SIZE;
+
+  let currentSkin: SkinName = options?.skin ?? 'classic';
+  let palette = SKIN_PALETTES[currentSkin];
 
   let snake: GridPoint[] = [];
   let direction: GridPoint = { x: 1, y: 0 };
@@ -91,8 +159,27 @@ export function createGame(
 
   const fruitImage = new Image();
   let fruitImageLoaded = false;
+  // Variante offscreen por skin: se tiñe una copia completa del atlas de
+  // frutas por cada skin en cuanto la imagen carga, y `drawFruit` solo
+  // conmuta cuál de esos canvas usa como fuente — sin regenerar nada en cada
+  // frame ni tocar el estado de la partida.
+  const tintedFruitAtlas: Partial<Record<SkinName, HTMLCanvasElement>> = {};
+
+  function buildTintedFruitAtlas(skin: SkinName): HTMLCanvasElement {
+    const offscreen = document.createElement('canvas');
+    offscreen.width = fruitImage.naturalWidth;
+    offscreen.height = fruitImage.naturalHeight;
+    const octx = offscreen.getContext('2d')!;
+    octx.filter = SKIN_PALETTES[skin].fruitFilter;
+    octx.drawImage(fruitImage, 0, 0);
+    return offscreen;
+  }
+
   fruitImage.onload = () => {
     fruitImageLoaded = true;
+    for (const skinName of SKIN_ORDER) {
+      tintedFruitAtlas[skinName] = buildTintedFruitAtlas(skinName);
+    }
   };
   fruitImage.src = FRUIT_SPRITE_SOURCE;
 
@@ -191,18 +278,23 @@ export function createGame(
   }
 
   function drawWalls() {
-    ctx.strokeStyle = '#0f0';
+    ctx.strokeStyle = palette.wall;
     ctx.lineWidth = WALL_THICKNESS;
+    if (palette.glow) {
+      ctx.shadowColor = palette.wall;
+      ctx.shadowBlur = palette.glowBlur;
+    }
     ctx.strokeRect(
       WALL_INSET,
       WALL_INSET,
       CANVAS_SIZE - WALL_INSET * 2,
       CANVAS_SIZE - WALL_INSET * 2,
     );
+    if (palette.glow) ctx.shadowBlur = 0;
   }
 
   function drawGrid() {
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+    ctx.strokeStyle = palette.grid;
     ctx.lineWidth = 1;
     for (let i = 1; i < GRID_SIZE; i++) {
       ctx.beginPath();
@@ -236,7 +328,7 @@ export function createGame(
       e1 = { x: cx - offset, y: cy + offset };
       e2 = { x: cx + offset, y: cy + offset };
     }
-    ctx.fillStyle = '#052e0f';
+    ctx.fillStyle = palette.eyeFill;
     for (const eye of [e1, e2]) {
       ctx.beginPath();
       ctx.arc(eye.x, eye.y, radius, 0, Math.PI * 2);
@@ -247,15 +339,21 @@ export function createGame(
   function drawSnake() {
     snake.forEach((segment, i) => {
       const isHead = i === 0;
-      ctx.fillStyle = isHead ? '#baffc9' : '#22c55e';
+      const fill = isHead ? palette.headFill : palette.bodyFill;
+      ctx.fillStyle = fill;
+      if (palette.glow) {
+        ctx.shadowColor = fill;
+        ctx.shadowBlur = palette.glowBlur * (isHead ? 1 : 0.6);
+      }
       ctx.fillRect(
         segment.x * CELL_SIZE + 1,
         segment.y * CELL_SIZE + 1,
         CELL_SIZE - 2,
         CELL_SIZE - 2,
       );
+      if (palette.glow) ctx.shadowBlur = 0;
       if (isHead) {
-        ctx.strokeStyle = '#052e0f';
+        ctx.strokeStyle = palette.headStroke;
         ctx.lineWidth = 2;
         ctx.strokeRect(
           segment.x * CELL_SIZE + 2,
@@ -270,9 +368,10 @@ export function createGame(
 
   function drawFruit() {
     const sprite = FRUIT_SPRITES[fruit.sprite];
-    if (fruitImageLoaded) {
+    const source = tintedFruitAtlas[currentSkin];
+    if (fruitImageLoaded && source) {
       ctx.drawImage(
-        fruitImage,
+        source,
         sprite.x,
         sprite.y,
         sprite.w,
@@ -286,7 +385,7 @@ export function createGame(
   }
 
   function draw() {
-    ctx.fillStyle = '#000';
+    ctx.fillStyle = palette.bg;
     ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
     drawGrid();
     drawFruit();
@@ -377,6 +476,11 @@ export function createGame(
       rafId = null;
       window.removeEventListener('keydown', handleKeyDown);
       void destroyed;
+    },
+    setSkin(skin: SkinName) {
+      currentSkin = skin;
+      palette = SKIN_PALETTES[skin];
+      draw();
     },
   };
 }

@@ -1,3 +1,5 @@
+import { SKIN_ORDER, type SkinName } from '../skins';
+
 export interface ArkanoidCallbacks {
   onScoreChange: (score: number) => void;
   onLivesChange: (lives: number) => void;
@@ -6,11 +8,95 @@ export interface ArkanoidCallbacks {
   onLevelChange: (level: number) => void;
 }
 
+export interface ArkanoidOptions {
+  skin?: SkinName;
+}
+
 export interface ArkanoidGame {
   pause: () => void;
   resume: () => void;
   destroy: () => void;
+  setSkin: (skin: SkinName) => void;
 }
+
+interface ArkanoidPalette {
+  bg: string;
+  hudText: string;
+  overlayBg: string;
+  overlayText: string;
+  pauseOverlayBg: string;
+  pauseTitle: string;
+  pauseSub: string;
+  pauseBorder: string;
+  pauseActiveFill: string;
+  pauseActiveText: string;
+  pauseInactiveFill: string;
+  pauseInactiveText: string;
+  glow: boolean;
+  glowColor: string;
+  glowBlur: number;
+  /** Filtro de canvas aplicado al copiar el atlas del spritesheet para esta skin. */
+  atlasFilter: string;
+}
+
+const SKIN_PALETTES: Record<SkinName, ArkanoidPalette> = {
+  classic: {
+    bg: '#000',
+    hudText: '#fff',
+    overlayBg: 'rgba(0, 0, 0, 0.6)',
+    overlayText: '#fff',
+    pauseOverlayBg: 'rgba(0, 0, 0, 0.65)',
+    pauseTitle: '#fff',
+    pauseSub: '#fff',
+    pauseBorder: '#fff',
+    pauseActiveFill: '#f0c040',
+    pauseActiveText: '#000',
+    pauseInactiveFill: '#444',
+    pauseInactiveText: '#fff',
+    glow: false,
+    glowColor: '',
+    glowBlur: 0,
+    atlasFilter: 'none',
+  },
+  neon: {
+    bg: '#050014',
+    hudText: '#00f5ff',
+    overlayBg: 'rgba(10, 0, 24, 0.65)',
+    overlayText: '#ff00ff',
+    pauseOverlayBg: 'rgba(10, 0, 24, 0.7)',
+    pauseTitle: '#00f5ff',
+    pauseSub: '#ff00ff',
+    pauseBorder: '#00f5ff',
+    pauseActiveFill: '#ff00ff',
+    pauseActiveText: '#000',
+    pauseInactiveFill: '#1a0033',
+    pauseInactiveText: '#00f5ff',
+    glow: true,
+    glowColor: '#00f5ff',
+    glowBlur: 16,
+    atlasFilter:
+      'saturate(2.4) brightness(1.15) contrast(1.05) hue-rotate(-8deg)',
+  },
+  retro: {
+    bg: '#001100',
+    hudText: '#00ff41',
+    overlayBg: 'rgba(0, 20, 0, 0.65)',
+    overlayText: '#00ff41',
+    pauseOverlayBg: 'rgba(0, 20, 0, 0.7)',
+    pauseTitle: '#00ff41',
+    pauseSub: '#00ff41',
+    pauseBorder: '#00ff41',
+    pauseActiveFill: '#ffb000',
+    pauseActiveText: '#000',
+    pauseInactiveFill: '#003300',
+    pauseInactiveText: '#00ff41',
+    glow: true,
+    glowColor: '#00ff41',
+    glowBlur: 8,
+    atlasFilter:
+      'grayscale(1) sepia(1) hue-rotate(70deg) saturate(4) brightness(1.05)',
+  },
+};
 
 const CANVAS_W = 800;
 
@@ -226,8 +312,11 @@ type GameState = 'playing' | 'gameover' | 'win';
 export function createGame(
   canvas: HTMLCanvasElement,
   callbacks: ArkanoidCallbacks,
+  options?: ArkanoidOptions,
 ): ArkanoidGame {
   const ctx = canvas.getContext('2d')!;
+  let currentSkin: SkinName = options?.skin ?? 'classic';
+  let palette = SKIN_PALETTES[currentSkin];
 
   const paddle: Paddle = { x: 0, y: 560, w: 81, h: 14 };
   const ball: Ball = { x: 0, y: 0, w: 16, h: 16, vx: 200, vy: -300 };
@@ -244,7 +333,9 @@ export function createGame(
   let isPaused = false;
   let gameOverFired = false;
 
-  let ssImg: HTMLCanvasElement | null = null;
+  // Un atlas offscreen por skin: `classic` es el original sin teñir; `neon`
+  // y `retro` aplican un filtro de canvas al copiarlo (ver SKIN_PALETTES).
+  const ssVariants: Partial<Record<SkinName, HTMLCanvasElement>> = {};
   let ssLoaded = false;
 
   const keys: Record<'ArrowLeft' | 'ArrowRight', boolean> = {
@@ -259,17 +350,30 @@ export function createGame(
   function loadSpritesheet(cb: () => void) {
     const rawImg = new Image();
     rawImg.onload = () => {
-      const oc = document.createElement('canvas');
-      oc.width = rawImg.width;
-      oc.height = rawImg.height;
-      const octx = oc.getContext('2d')!;
-      octx.drawImage(rawImg, 0, 0);
-      ssImg = oc;
+      for (const skin of SKIN_ORDER) {
+        const oc = document.createElement('canvas');
+        oc.width = rawImg.width;
+        oc.height = rawImg.height;
+        const octx = oc.getContext('2d')!;
+        octx.filter = SKIN_PALETTES[skin].atlasFilter;
+        octx.drawImage(rawImg, 0, 0);
+        octx.filter = 'none';
+        ssVariants[skin] = oc;
+      }
       ssLoaded = true;
       cb();
     };
     rawImg.onerror = () => console.error('Failed to load spritesheet');
     rawImg.src = '/assets/arkanoid/spritesheet-breakout.png';
+  }
+
+  function withGlow(context: CanvasRenderingContext2D, draw: () => void) {
+    if (palette.glow) {
+      context.shadowColor = palette.glowColor;
+      context.shadowBlur = palette.glowBlur;
+    }
+    draw();
+    if (palette.glow) context.shadowBlur = 0;
   }
 
   function drawFrame(
@@ -280,17 +384,20 @@ export function createGame(
     w: number,
     h: number,
   ) {
-    if (!ssLoaded || !ssImg) return;
-    context.drawImage(
-      ssImg,
-      frame.sx,
-      frame.sy,
-      frame.sw,
-      frame.sh,
-      x,
-      y,
-      w,
-      h,
+    const atlas = ssVariants[currentSkin];
+    if (!ssLoaded || !atlas) return;
+    withGlow(context, () =>
+      context.drawImage(
+        atlas,
+        frame.sx,
+        frame.sy,
+        frame.sw,
+        frame.sh,
+        x,
+        y,
+        w,
+        h,
+      ),
     );
   }
 
@@ -302,12 +409,15 @@ export function createGame(
     w: number,
     h: number,
   ) {
-    if (!ssLoaded || !ssImg) return;
+    const atlas = ssVariants[currentSkin];
+    if (!ssLoaded || !atlas) return;
     const sp = name.startsWith('block_')
       ? SPRITES.blocks[name.slice(6) as BlockColor]
       : SPRITES[name as 'paddle' | 'ball'];
     if (!sp) return;
-    context.drawImage(ssImg, sp.sx, sp.sy, sp.sw, sp.sh, x, y, w, h);
+    withGlow(context, () =>
+      context.drawImage(atlas, sp.sx, sp.sy, sp.sw, sp.sh, x, y, w, h),
+    );
   }
 
   function setScore(next: number) {
@@ -449,9 +559,9 @@ export function createGame(
   }
 
   function drawOverlay(message: string) {
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+    ctx.fillStyle = palette.overlayBg;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = '#fff';
+    ctx.fillStyle = palette.overlayText;
     ctx.font = 'bold 64px monospace';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -459,29 +569,34 @@ export function createGame(
   }
 
   function drawPauseOverlay() {
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
+    ctx.fillStyle = palette.pauseOverlayBg;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    ctx.fillStyle = '#fff';
+    ctx.fillStyle = palette.pauseTitle;
     ctx.font = 'bold 56px monospace';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText('PAUSA', canvas.width / 2, 260);
 
+    ctx.fillStyle = palette.pauseSub;
     ctx.font = 'bold 16px monospace';
     ctx.fillText('Saltar al nivel:', canvas.width / 2, 310);
 
     for (let i = 0; i < 5; i++) {
       const bx = PAUSE_BTN_ROW_X + i * (PAUSE_BTN_W + PAUSE_BTN_GAP);
       const isActive = i + 1 === currentLevel;
-      ctx.fillStyle = isActive ? '#f0c040' : '#444';
-      ctx.strokeStyle = '#fff';
+      ctx.fillStyle = isActive
+        ? palette.pauseActiveFill
+        : palette.pauseInactiveFill;
+      ctx.strokeStyle = palette.pauseBorder;
       ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.roundRect(bx, PAUSE_BTN_Y, PAUSE_BTN_W, PAUSE_BTN_H, 6);
       ctx.fill();
       ctx.stroke();
-      ctx.fillStyle = isActive ? '#000' : '#fff';
+      ctx.fillStyle = isActive
+        ? palette.pauseActiveText
+        : palette.pauseInactiveText;
       ctx.font = 'bold 20px monospace';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
@@ -494,7 +609,7 @@ export function createGame(
   }
 
   function draw() {
-    ctx.fillStyle = '#000';
+    ctx.fillStyle = palette.bg;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     for (const block of blocks) {
@@ -528,7 +643,7 @@ export function createGame(
     drawSprite(ctx, 'ball', ball.x, ball.y, ball.w, ball.h);
 
     if (gameState === 'playing') {
-      ctx.fillStyle = '#fff';
+      ctx.fillStyle = palette.hudText;
       ctx.font = 'bold 18px monospace';
       ctx.textAlign = 'left';
       ctx.textBaseline = 'top';
@@ -652,6 +767,11 @@ export function createGame(
       canvas.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
+    },
+    setSkin(skin: SkinName) {
+      currentSkin = skin;
+      palette = SKIN_PALETTES[skin];
+      draw();
     },
   };
 }

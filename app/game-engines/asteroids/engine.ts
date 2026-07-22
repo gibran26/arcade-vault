@@ -1,3 +1,5 @@
+import type { SkinName } from '../skins';
+
 export interface AsteroidsCallbacks {
   onScoreChange: (score: number) => void;
   onLivesChange: (lives: number) => void;
@@ -6,11 +8,76 @@ export interface AsteroidsCallbacks {
   onLevelChange?: (level: number) => void;
 }
 
+export interface AsteroidsOptions {
+  skin?: SkinName;
+}
+
 export interface AsteroidsGame {
   pause: () => void;
   resume: () => void;
   destroy: () => void;
+  setSkin: (skin: SkinName) => void;
 }
+
+interface AsteroidsPalette {
+  bg: string;
+  ship: string;
+  thrust: string;
+  asteroid: string;
+  bullet: string;
+  particleRGB: string;
+  powerup: string;
+  hudText: string;
+  overlayTitle: string;
+  overlaySub: string;
+  glow: boolean;
+  glowBlur: number;
+}
+
+const SKIN_PALETTES: Record<SkinName, AsteroidsPalette> = {
+  classic: {
+    bg: '#000',
+    ship: '#fff',
+    thrust: 'rgba(255, 130, 0, 0.85)',
+    asteroid: '#fff',
+    bullet: '#fff',
+    particleRGB: '255,255,255',
+    powerup: '#0ff',
+    hudText: '#fff',
+    overlayTitle: '#fff',
+    overlaySub: 'rgba(255,255,255,0.65)',
+    glow: false,
+    glowBlur: 0,
+  },
+  neon: {
+    bg: '#0a0014',
+    ship: '#00f5ff',
+    thrust: 'rgba(255,0,255,0.9)',
+    asteroid: '#ff00ff',
+    bullet: '#00f5ff',
+    particleRGB: '255,0,255',
+    powerup: '#ff00ff',
+    hudText: '#00f5ff',
+    overlayTitle: '#ff00ff',
+    overlaySub: 'rgba(0,245,255,0.75)',
+    glow: true,
+    glowBlur: 14,
+  },
+  retro: {
+    bg: '#001100',
+    ship: '#00ff41',
+    thrust: 'rgba(255,176,0,0.85)',
+    asteroid: '#00ff41',
+    bullet: '#00ff41',
+    particleRGB: '0,255,65',
+    powerup: '#ffb000',
+    hudText: '#00ff41',
+    overlayTitle: '#ffb000',
+    overlaySub: 'rgba(0,255,65,0.7)',
+    glow: true,
+    glowBlur: 6,
+  },
+};
 
 const W = 800;
 const H = 600;
@@ -54,11 +121,16 @@ class Bullet {
     if (this.ttl <= 0) this.dead = true;
   }
 
-  draw(ctx: CanvasRenderingContext2D) {
-    ctx.fillStyle = '#fff';
+  draw(ctx: CanvasRenderingContext2D, palette: AsteroidsPalette) {
+    ctx.fillStyle = palette.bullet;
+    if (palette.glow) {
+      ctx.shadowColor = palette.bullet;
+      ctx.shadowBlur = palette.glowBlur * 0.6;
+    }
     ctx.beginPath();
     ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
     ctx.fill();
+    if (palette.glow) ctx.shadowBlur = 0;
   }
 }
 
@@ -109,13 +181,17 @@ class Asteroid {
     ];
   }
 
-  draw(ctx: CanvasRenderingContext2D) {
+  draw(ctx: CanvasRenderingContext2D, palette: AsteroidsPalette) {
     ctx.save();
     ctx.translate(this.x, this.y);
     ctx.rotate(this.rot);
-    ctx.strokeStyle = '#fff';
+    ctx.strokeStyle = palette.asteroid;
     ctx.lineWidth = 1.5;
     ctx.lineJoin = 'round';
+    if (palette.glow) {
+      ctx.shadowColor = palette.asteroid;
+      ctx.shadowBlur = palette.glowBlur;
+    }
     ctx.beginPath();
     ctx.moveTo(this.verts[0][0], this.verts[0][1]);
     for (let i = 1; i < this.verts.length; i++)
@@ -151,18 +227,23 @@ class PowerUp {
     if (this.ttl <= 0) this.dead = true;
   }
 
-  draw(ctx: CanvasRenderingContext2D) {
+  draw(ctx: CanvasRenderingContext2D, palette: AsteroidsPalette) {
     if (this.ttl < 2 && Math.floor(this.ttl * 8) % 2 === 0) return;
     const pulse = 0.85 + Math.sin(performance.now() / 150) * 0.15;
     ctx.save();
     ctx.translate(this.x, this.y);
     ctx.rotate(Math.PI / 4);
-    ctx.strokeStyle = '#0ff';
+    ctx.strokeStyle = palette.powerup;
     ctx.lineWidth = 2;
+    if (palette.glow) {
+      ctx.shadowColor = palette.powerup;
+      ctx.shadowBlur = palette.glowBlur;
+    }
     const r = this.radius * pulse;
     ctx.strokeRect(-r, -r, r * 2, r * 2);
     ctx.restore();
-    ctx.fillStyle = '#0ff';
+    if (palette.glow) ctx.shadowBlur = 0;
+    ctx.fillStyle = palette.powerup;
     ctx.font = 'bold 12px monospace';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -238,7 +319,7 @@ class Ship {
     return [new Bullet(ox, oy, this.angle)];
   }
 
-  draw(ctx: CanvasRenderingContext2D) {
+  draw(ctx: CanvasRenderingContext2D, palette: AsteroidsPalette) {
     if (this.dead) return;
     if (this.invincible > 0 && Math.floor(this.invincible * 8) % 2 === 0)
       return;
@@ -246,9 +327,13 @@ class Ship {
     ctx.save();
     ctx.translate(this.x, this.y);
     ctx.rotate(this.angle);
-    ctx.strokeStyle = '#fff';
+    ctx.strokeStyle = palette.ship;
     ctx.lineWidth = 1.5;
     ctx.lineJoin = 'round';
+    if (palette.glow) {
+      ctx.shadowColor = palette.ship;
+      ctx.shadowBlur = palette.glowBlur;
+    }
 
     ctx.beginPath();
     ctx.moveTo(20, 0);
@@ -263,7 +348,7 @@ class Ship {
       ctx.moveTo(-8, -4);
       ctx.lineTo(-8 - rand(6, 14), 0);
       ctx.lineTo(-8, 4);
-      ctx.strokeStyle = 'rgba(255, 130, 0, 0.85)';
+      ctx.strokeStyle = palette.thrust;
       ctx.stroke();
     }
 
@@ -298,9 +383,9 @@ class Particle {
     if (this.ttl <= 0) this.dead = true;
   }
 
-  draw(ctx: CanvasRenderingContext2D) {
+  draw(ctx: CanvasRenderingContext2D, palette: AsteroidsPalette) {
     const alpha = this.ttl / this.life;
-    ctx.strokeStyle = `rgba(255,255,255,${alpha.toFixed(2)})`;
+    ctx.strokeStyle = `rgba(${palette.particleRGB},${alpha.toFixed(2)})`;
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(this.x, this.y);
@@ -314,8 +399,10 @@ type GameState = 'playing' | 'dead' | 'gameover';
 export function createGame(
   canvas: HTMLCanvasElement,
   callbacks: AsteroidsCallbacks,
+  options?: AsteroidsOptions,
 ): AsteroidsGame {
   const ctx = canvas.getContext('2d')!;
+  let palette = SKIN_PALETTES[options?.skin ?? 'classic'];
 
   const keys: Record<string, boolean> = {};
   const justPressed: Record<string, boolean> = {};
@@ -497,9 +584,13 @@ export function createGame(
     ctx.save();
     ctx.translate(x, y);
     ctx.rotate(-Math.PI / 2);
-    ctx.strokeStyle = '#fff';
+    ctx.strokeStyle = palette.ship;
     ctx.lineWidth = 1.2;
     ctx.lineJoin = 'round';
+    if (palette.glow) {
+      ctx.shadowColor = palette.ship;
+      ctx.shadowBlur = palette.glowBlur * 0.5;
+    }
     ctx.beginPath();
     ctx.moveTo(9, 0);
     ctx.lineTo(-6, -5);
@@ -511,7 +602,7 @@ export function createGame(
   }
 
   function drawHUD() {
-    ctx.fillStyle = '#fff';
+    ctx.fillStyle = palette.hudText;
     ctx.font = '15px monospace';
 
     ctx.textAlign = 'left';
@@ -524,30 +615,30 @@ export function createGame(
 
     if (ship.tripleShot > 0) {
       ctx.textAlign = 'left';
-      ctx.fillStyle = '#0ff';
+      ctx.fillStyle = palette.powerup;
       ctx.fillText(`3x  ${ship.tripleShot.toFixed(1)}s`, 14, 46);
     }
   }
 
   function drawOverlay(title: string, sub: string) {
     ctx.textAlign = 'center';
-    ctx.fillStyle = '#fff';
+    ctx.fillStyle = palette.overlayTitle;
     ctx.font = 'bold 46px monospace';
     ctx.fillText(title, W / 2, H / 2 - 18);
     ctx.font = '18px monospace';
-    ctx.fillStyle = 'rgba(255,255,255,0.65)';
+    ctx.fillStyle = palette.overlaySub;
     ctx.fillText(sub, W / 2, H / 2 + 22);
   }
 
   function draw() {
-    ctx.fillStyle = '#000';
+    ctx.fillStyle = palette.bg;
     ctx.fillRect(0, 0, W, H);
 
-    particles.forEach((p) => p.draw(ctx));
-    asteroids.forEach((a) => a.draw(ctx));
-    powerUps.forEach((p) => p.draw(ctx));
-    bullets.forEach((b) => b.draw(ctx));
-    ship.draw(ctx);
+    particles.forEach((p) => p.draw(ctx, palette));
+    asteroids.forEach((a) => a.draw(ctx, palette));
+    powerUps.forEach((p) => p.draw(ctx, palette));
+    bullets.forEach((b) => b.draw(ctx, palette));
+    ship.draw(ctx, palette);
 
     drawHUD();
 
@@ -614,6 +705,10 @@ export function createGame(
       rafId = null;
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
+    },
+    setSkin(skin: SkinName) {
+      palette = SKIN_PALETTES[skin];
+      draw();
     },
   };
 }
