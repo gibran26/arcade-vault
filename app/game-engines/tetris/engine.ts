@@ -1,3 +1,5 @@
+import type { SkinName } from '../skins';
+
 export interface TetrisCallbacks {
   onScoreChange: (score: number) => void;
   onLivesChange: (lives: number) => void;
@@ -6,10 +8,15 @@ export interface TetrisCallbacks {
   onLevelChange: (level: number) => void;
 }
 
+export interface TetrisOptions {
+  skin?: SkinName;
+}
+
 export interface TetrisGame {
   pause: () => void;
   resume: () => void;
   destroy: () => void;
+  setSkin: (skin: SkinName) => void;
 }
 
 const COLS = 10;
@@ -23,17 +30,99 @@ const PANEL_W = 180; // W total del canvas = 480
 const CANVAS_W = PANEL_X + PANEL_W; // 480
 const CANVAS_H = H; // 600
 
-const COLORS = [
-  null,
-  '#4dd0e1', // I - cyan
-  '#ffd54f', // O - yellow
-  '#ba68c8', // T - purple
-  '#81c784', // S - green
-  '#e57373', // Z - red
-  '#90caf9', // J - pale blue
-  '#ffb74d', // L - orange
-  '#9e9e9e', // N - tuerca (gris metálico)
-];
+interface TetrisPalette {
+  pieces: (string | null)[];
+  boardBg: string;
+  gridLine: string;
+  blockHighlight: string;
+  panelBg: string;
+  panelOverlay: string;
+  panelBorder: string;
+  labelColor: string;
+  valueColor: string;
+  overlayBg: string;
+  overlayText: string;
+  glow: boolean;
+  glowBlur: number;
+}
+
+const SKIN_PALETTES: Record<SkinName, TetrisPalette> = {
+  classic: {
+    pieces: [
+      null,
+      '#4dd0e1', // I - cyan
+      '#ffd54f', // O - yellow
+      '#ba68c8', // T - purple
+      '#81c784', // S - green
+      '#e57373', // Z - red
+      '#90caf9', // J - pale blue
+      '#ffb74d', // L - orange
+      '#9e9e9e', // N - tuerca (gris metálico)
+    ],
+    boardBg: '#000',
+    gridLine: 'rgba(255,255,255,0.08)',
+    blockHighlight: 'rgba(255,255,255,0.12)',
+    panelBg: '#0a0a0f',
+    panelOverlay: 'rgba(255,255,255,0.03)',
+    panelBorder: 'rgba(255,255,255,0.15)',
+    labelColor: 'rgba(255,255,255,0.5)',
+    valueColor: '#fff',
+    overlayBg: 'rgba(0,0,0,0.6)',
+    overlayText: '#fff',
+    glow: false,
+    glowBlur: 0,
+  },
+  neon: {
+    pieces: [
+      null,
+      '#00f5ff', // I - cian
+      '#ff00ff', // O - magenta
+      '#00ffff', // T - cian brillante
+      '#ff2fd0', // S - rosa magenta
+      '#7cf9ff', // Z - cian pálido
+      '#ff66ff', // J - magenta claro
+      '#00d9ff', // L - cian variante
+      '#e000ff', // N - púrpura magenta (tuerca)
+    ],
+    boardBg: '#0a0014',
+    gridLine: 'rgba(0,245,255,0.16)',
+    blockHighlight: 'rgba(255,255,255,0.2)',
+    panelBg: '#0a0014',
+    panelOverlay: 'rgba(255,0,255,0.05)',
+    panelBorder: 'rgba(0,245,255,0.45)',
+    labelColor: 'rgba(255,0,255,0.7)',
+    valueColor: '#00f5ff',
+    overlayBg: 'rgba(20,0,30,0.7)',
+    overlayText: '#ff00ff',
+    glow: true,
+    glowBlur: 14,
+  },
+  retro: {
+    pieces: [
+      null,
+      '#39ff14', // I
+      '#66ff66', // O
+      '#22dd55', // T
+      '#00e676', // S
+      '#2eff9e', // Z
+      '#00ff88', // J
+      '#7dffb3', // L
+      '#00c853', // N (tuerca)
+    ],
+    boardBg: '#001100',
+    gridLine: 'rgba(0,255,65,0.14)',
+    blockHighlight: 'rgba(0,255,65,0.18)',
+    panelBg: '#000800',
+    panelOverlay: 'rgba(0,255,65,0.04)',
+    panelBorder: 'rgba(255,176,0,0.4)',
+    labelColor: 'rgba(255,176,0,0.6)',
+    valueColor: '#00ff41',
+    overlayBg: 'rgba(0,20,0,0.75)',
+    overlayText: '#ffb000',
+    glow: true,
+    glowBlur: 6,
+  },
+};
 
 const PIECES: (number[][] | null)[] = [
   null,
@@ -91,10 +180,12 @@ interface Piece {
 export function createGame(
   canvas: HTMLCanvasElement,
   callbacks: TetrisCallbacks,
+  options?: TetrisOptions,
 ): TetrisGame {
   canvas.width = CANVAS_W;
   canvas.height = CANVAS_H;
   const ctx = canvas.getContext('2d')!;
+  let palette = SKIN_PALETTES[options?.skin ?? 'classic'];
 
   const board: number[][] = createBoard();
   let current: Piece;
@@ -249,17 +340,22 @@ export function createGame(
     alpha?: number,
   ) {
     if (!colorIndex) return;
-    const color = COLORS[colorIndex]!;
+    const color = palette.pieces[colorIndex]!;
     context.globalAlpha = alpha ?? 1;
+    if (palette.glow) {
+      context.shadowColor = color;
+      context.shadowBlur = palette.glowBlur;
+    }
     context.fillStyle = color;
     context.fillRect(x * size + 1, y * size + 1, size - 2, size - 2);
-    context.fillStyle = 'rgba(255,255,255,0.12)';
+    if (palette.glow) context.shadowBlur = 0;
+    context.fillStyle = palette.blockHighlight;
     context.fillRect(x * size + 1, y * size + 1, size - 2, 4);
     context.globalAlpha = 1;
   }
 
   function drawGrid() {
-    ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+    ctx.strokeStyle = palette.gridLine;
     ctx.lineWidth = 0.5;
     for (let c = 1; c < COLS; c++) {
       ctx.beginPath();
@@ -276,7 +372,7 @@ export function createGame(
   }
 
   function drawBoard() {
-    ctx.fillStyle = '#000';
+    ctx.fillStyle = palette.boardBg;
     ctx.fillRect(0, 0, W, H);
     drawGrid();
 
@@ -315,8 +411,12 @@ export function createGame(
     for (let r = 0; r < shape.length; r++)
       for (let c = 0; c < shape[r].length; c++) {
         if (!shape[r][c]) continue;
-        const color = COLORS[shape[r][c]]!;
+        const color = palette.pieces[shape[r][c]]!;
         ctx.globalAlpha = 1;
+        if (palette.glow) {
+          ctx.shadowColor = color;
+          ctx.shadowBlur = palette.glowBlur;
+        }
         ctx.fillStyle = color;
         ctx.fillRect(
           x + (offX + c) * NB + 1,
@@ -324,7 +424,8 @@ export function createGame(
           NB - 2,
           NB - 2,
         );
-        ctx.fillStyle = 'rgba(255,255,255,0.12)';
+        if (palette.glow) ctx.shadowBlur = 0;
+        ctx.fillStyle = palette.blockHighlight;
         ctx.fillRect(
           x + (offX + c) * NB + 1,
           y + (offY + r) * NB + 1,
@@ -335,11 +436,11 @@ export function createGame(
   }
 
   function drawPanel() {
-    ctx.fillStyle = '#0a0a0f';
+    ctx.fillStyle = palette.panelBg;
     ctx.fillRect(PANEL_X, 0, PANEL_W, CANVAS_H);
-    ctx.fillStyle = 'rgba(255,255,255,0.03)';
+    ctx.fillStyle = palette.panelOverlay;
     ctx.fillRect(PANEL_X, 0, PANEL_W, CANVAS_H);
-    ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+    ctx.strokeStyle = palette.panelBorder;
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(PANEL_X, 0);
@@ -349,28 +450,28 @@ export function createGame(
     const labelX = PANEL_X + 16;
 
     ctx.textAlign = 'left';
-    ctx.fillStyle = 'rgba(255,255,255,0.5)';
+    ctx.fillStyle = palette.labelColor;
     ctx.font = 'bold 13px monospace';
     ctx.fillText('SCORE', labelX, 30);
-    ctx.fillStyle = '#fff';
+    ctx.fillStyle = palette.valueColor;
     ctx.font = 'bold 20px monospace';
     ctx.fillText(score.toLocaleString(), labelX, 56);
 
-    ctx.fillStyle = 'rgba(255,255,255,0.5)';
+    ctx.fillStyle = palette.labelColor;
     ctx.font = 'bold 13px monospace';
     ctx.fillText('LINES', labelX, 96);
-    ctx.fillStyle = '#fff';
+    ctx.fillStyle = palette.valueColor;
     ctx.font = 'bold 20px monospace';
     ctx.fillText(String(lines), labelX, 122);
 
-    ctx.fillStyle = 'rgba(255,255,255,0.5)';
+    ctx.fillStyle = palette.labelColor;
     ctx.font = 'bold 13px monospace';
     ctx.fillText('LEVEL', labelX, 162);
-    ctx.fillStyle = '#fff';
+    ctx.fillStyle = palette.valueColor;
     ctx.font = 'bold 20px monospace';
     ctx.fillText(String(level), labelX, 188);
 
-    ctx.fillStyle = 'rgba(255,255,255,0.5)';
+    ctx.fillStyle = palette.labelColor;
     ctx.font = 'bold 13px monospace';
     ctx.fillText('NEXT', labelX, 228);
     drawNextPreview(labelX, 244);
@@ -378,9 +479,9 @@ export function createGame(
 
   function drawOverlay(title: string) {
     ctx.textAlign = 'center';
-    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+    ctx.fillStyle = palette.overlayBg;
     ctx.fillRect(0, 0, W, H);
-    ctx.fillStyle = '#fff';
+    ctx.fillStyle = palette.overlayText;
     ctx.font = 'bold 28px monospace';
     ctx.fillText(title, W / 2, H / 2);
   }
@@ -513,6 +614,10 @@ export function createGame(
     destroy() {
       stopLoop();
       window.removeEventListener('keydown', handleKeyDown);
+    },
+    setSkin(skin: SkinName) {
+      palette = SKIN_PALETTES[skin];
+      draw();
     },
   };
 }

@@ -20,6 +20,7 @@ No hay un runner de tests configurado en este proyecto. La verificación de camb
 ## Agentes
 
 - **`game-planner`** (`.claude/agents/game-planner.md`) — decide qué juego nuevo conviene integrar a Arcade Vault. Analiza el catálogo (`app/data/games.ts`), los juegos ya implementados y los specs en curso, y propone una recomendación ganadora + shortlist justificada; puede proponer incluso una categoría nueva fuera de `CATS`, señalando que habría que extenderla en `app/data/types.ts`. Mantiene su memoria como un to-do por secciones de estado (🎯 Sugeridos, 👍 Aceptados, ✅ Implementados, 🗑️ Rechazados) en `references/game-suggestions-todo.md`. Solo sugiere: no escribe specs ni código.
+- **`skin-designer`** (`.claude/agents/skin-designer.md`) — audita e implementa el selector de skins visuales (`classic`/`neon`/`retro`) en los juegos que se le indiquen. Revisa si el juego ya tiene el selector en su HUD principal y, si le falta, lo implementa: paleta por skin en el motor (`app/game-engines/<id>/engine.ts`), estado y control en `GamePlayClient.tsx`, y estilos del chrome en `globals.css`. Persiste la elección por juego en `localStorage` (`av_skin_<id>`). A diferencia de `game-planner`, sí escribe y edita código de la aplicación.
 
 ## Stack técnico
 

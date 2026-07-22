@@ -4,6 +4,13 @@ import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/app/context/auth-context';
 import { GAME_ENGINES, type EngineInstance } from '@/app/game-engines/registry';
+import {
+  SKIN_LABELS,
+  SKIN_ORDER,
+  loadSkin,
+  saveSkin,
+  type SkinName,
+} from '@/app/game-engines/skins';
 import { saveScore } from '@/app/lib/supabase/actions';
 import type { Game } from '@/app/data/types';
 
@@ -21,26 +28,33 @@ export default function GamePlayClient({ game }: { game: Game }) {
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [skin, setSkinState] = useState<SkinName>('classic');
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const engineRef = useRef<EngineInstance | null>(null);
 
-  const startEngine = () => {
+  const startEngine = (skinOverride?: SkinName) => {
     if (!canvasRef.current) return;
-    engineRef.current = entry.createGame(canvasRef.current, {
-      onScoreChange: setScore,
-      onLivesChange: setLives,
-      onGameOver: (finalScore) => {
-        setScore(finalScore);
-        setOver(true);
+    engineRef.current = entry.createGame(
+      canvasRef.current,
+      {
+        onScoreChange: setScore,
+        onLivesChange: setLives,
+        onGameOver: (finalScore) => {
+          setScore(finalScore);
+          setOver(true);
+        },
+        onPauseChange: setPaused,
+        onLevelChange: setLevel,
       },
-      onPauseChange: setPaused,
-      onLevelChange: setLevel,
-    });
+      { skin: skinOverride ?? skin },
+    );
   };
 
   useEffect(() => {
-    startEngine();
+    const initialSkin = loadSkin(game.id);
+    setSkinState(initialSkin);
+    startEngine(initialSkin);
     return () => {
       engineRef.current?.destroy();
       engineRef.current = null;
@@ -62,6 +76,12 @@ export default function GamePlayClient({ game }: { game: Game }) {
     setSaving(false);
     setSaveError(null);
   };
+  const changeSkin = (next: SkinName) => {
+    if (next === skin) return;
+    saveSkin(game.id, next);
+    setSkinState(next);
+    engineRef.current?.setSkin?.(next);
+  };
 
   const handleSaveScore = async () => {
     setSaving(true);
@@ -77,7 +97,7 @@ export default function GamePlayClient({ game }: { game: Game }) {
   };
 
   return (
-    <div className="av-player fade-in">
+    <div className="av-player fade-in" data-skin={skin}>
       <div className="player-hud">
         <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
           <div className="hud-stat">
@@ -100,6 +120,20 @@ export default function GamePlayClient({ game }: { game: Game }) {
           </div>
         </div>
         <div className="hud-actions">
+          {entry.skins && (
+            <select
+              className="hud-skins"
+              aria-label="Skin visual"
+              value={skin}
+              onChange={(e) => changeSkin(e.target.value as SkinName)}
+            >
+              {SKIN_ORDER.map((s) => (
+                <option key={s} value={s}>
+                  {SKIN_LABELS[s]}
+                </option>
+              ))}
+            </select>
+          )}
           <button className="btn yellow" onClick={togglePause}>
             {paused ? 'REANUDAR' : 'PAUSA'}
           </button>
