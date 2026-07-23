@@ -1,6 +1,6 @@
 # 10 — Controles táctiles y adaptación móvil
 
-**Estado:** Aprobado
+**Estado:** Implementado
 **Depende de:** 05-asteroids-motor-real, 07-tetris-motor-leaderboard, 08-arkanoid-motor-leaderboard, 09-snake-motor-leaderboard (registro `GAME_ENGINES` y los 4 motores ya existentes, que no se modifican por dentro)
 **Fecha:** 2026-07-22
 **Objetivo:** Hacer que los 4 juegos jugables (Asteroids, Tetris, Arkanoid, Snake) funcionen y se vean correctamente en dispositivos móviles táctiles, agregando un panel de controles táctiles genérico (joystick + botones de acción + pausa/fin/regresar) declarado por juego en `app/game-engines/registry.ts` —sin modificar el código interno de ningún `engine.ts`—, junto con el escalado responsive del canvas (por ancho **y por alto**, en cualquier dispositivo) y la ocultación del Nav global durante la partida en viewports táctiles.
@@ -182,30 +182,30 @@
 
 ## Criterios de aceptación
 
-- [ ] `app/lib/use-touch-device.ts` exporta `useTouchDevice()`, basado en `matchMedia('(pointer: coarse)')`, con `false` por defecto en el primer render de servidor/cliente.
-- [ ] En cualquier viewport angosto (táctil o no), el `canvas` de los 4 juegos se escala dentro de `.crt-screen` sin desbordar horizontalmente ni generar scroll horizontal en la página.
-- [ ] En cualquier viewport de poca altura (táctil o no, ej. una laptop con ~625–768px de alto útil de ventana), el `canvas` de los 4 juegos se escala dentro de `.crt-screen` sin desbordar verticalmente — el juego completo (HUD + `crt` + `crt-bottom` + footer) es visible sin necesitar scroll vertical dentro de la partida.
-- [ ] En cualquier tamaño de viewport, el borde visible de `.crt-screen` coincide exactamente con el tamaño real del `canvas` — no queda espacio negro "muerto" alrededor del `canvas` que pueda confundirse con parte del juego; el límite jugable es siempre distinguible a simple vista.
-- [ ] En viewports de altura reducida donde el `canvas` se encoge, su tamaño se mantiene cómodamente legible (no cae por debajo del piso mínimo definido: `280px` de alto en desktop, `240px` en táctil) — se prioriza esto sobre garantizar cero scroll en el caso límite absoluto.
-- [ ] En desktop con ancho y alto suficientes, el `canvas` de los 4 juegos conserva su tamaño nativo (800×600 / 480×600 / 600×600); el marco `.crt-screen` ya no fuerza un `aspect-ratio: 4/3` fijo (cambio intencional: el marco ahora siempre se ajusta al tamaño real del `canvas`, en vez de reservar espacio vacío alrededor de los canvas que no son 4:3).
-- [ ] `app/game-engines/registry.ts` expone `TouchControlsSchema`/`JoystickMapping`/`ActionButtonMapping` y cada entrada de `GAME_ENGINES` (`asteroids`, `tetris`, `arkanoid`, `snake`) incluye su `touchControls` con el mapeo definido en el Modelo de datos.
-- [ ] Ninguno de los archivos `app/game-engines/{asteroids,tetris,arkanoid,snake}/engine.ts` se modifica como parte de este spec.
-- [ ] En un dispositivo/emulador táctil (`pointer: coarse`), `/game/[id]/play` muestra el panel `TouchControls` debajo del `crt`, con joystick + hasta 2 botones de acción (deshabilitados visualmente si el juego no los mapea) + PAUSA + FIN + REGRESAR.
-- [ ] En desktop (sin `pointer: coarse`), el panel `TouchControls` no se renderiza.
-- [ ] **Asteroids táctil**: el joystick izquierda/derecha rota la nave, arriba activa el empuje, y el botón de acción dispara — mismo efecto que `←`/`→`/`↑`/`Espacio` en desktop.
-- [ ] **Tetris táctil**: el joystick izquierda/derecha mueve la pieza, abajo hace caída suave; un botón de acción rota la pieza y el otro ejecuta caída instantánea — mismo efecto que sus teclas equivalentes en desktop.
-- [ ] **Arkanoid táctil**: el joystick izquierda/derecha mueve la paleta — mismo efecto que `←`/`→` en desktop; los dos botones de acción se muestran deshabilitados (sin función).
-- [ ] **Snake táctil**: el joystick en sus 4 direcciones controla el movimiento de la serpiente — mismo efecto que flechas/WASD en desktop; los dos botones de acción se muestran deshabilitados (sin función).
-- [ ] En táctil, el botón PAUSA del panel pausa/reanuda el juego real (mismo `pause()`/`resume()` que el botón "PAUSA" del HUD superior en desktop).
-- [ ] En táctil, el botón FIN del panel termina la partida manualmente, mostrando el modal "FIN DEL JUEGO" — mismo comportamiento que el botón "FIN" del HUD superior en desktop.
-- [ ] En táctil, el botón REGRESAR del panel navega a `/game/[id]` — mismo destino que el botón "SALIR" del HUD superior en desktop.
-- [ ] En táctil (altura de viewport normal), el `player-hud` superior se compacta en una sola fila delgada con stats abreviadas (Jugador/Puntuación/Vidas/Nivel) y el selector de skin reducido; los botones PAUSA/FIN/SALIR quedan ocultos.
-- [ ] En táctil con viewport de altura muy reducida (`max-height: 500px`, ej. teléfono en landscape), el `player-hud` no se renderiza en absoluto.
-- [ ] En desktop, el `player-hud` superior se ve exactamente igual que hoy (stats + selector de skin + PAUSA/FIN/SALIR, sin compactar).
-- [ ] En táctil, `components/Nav.tsx` no se renderiza en `/game/[id]/play`; en cualquier otra ruta, o en desktop, el Nav se comporta exactamente igual que hoy.
-- [ ] Los elementos táctiles del panel (joystick, botones) tienen una hitbox de al menos ~44px, apta para el dedo.
-- [ ] El resto del catálogo, el guardado de puntuación, y el salón de la fama no presentan regresiones.
-- [ ] `npm run build` compila sin errores de TypeScript ni de ESLint.
+- [x] `app/lib/use-touch-device.ts` exporta `useTouchDevice()`, basado en `matchMedia('(pointer: coarse)')`, con `false` por defecto en el primer render de servidor/cliente.
+- [x] En cualquier viewport angosto (táctil o no), el `canvas` de los 4 juegos se escala dentro de `.crt-screen` sin desbordar horizontalmente ni generar scroll horizontal en la página.
+- [x] En cualquier viewport de poca altura (táctil o no, ej. una laptop con ~625–768px de alto útil de ventana), el `canvas` de los 4 juegos se escala dentro de `.crt-screen` sin desbordar verticalmente — el juego completo (HUD + `crt` + `crt-bottom` + footer) es visible sin necesitar scroll vertical dentro de la partida.
+- [x] En cualquier tamaño de viewport, el borde visible de `.crt-screen` coincide exactamente con el tamaño real del `canvas` — no queda espacio negro "muerto" alrededor del `canvas` que pueda confundirse con parte del juego; el límite jugable es siempre distinguible a simple vista.
+- [x] En viewports de altura reducida donde el `canvas` se encoge, su tamaño se mantiene cómodamente legible (no cae por debajo del piso mínimo definido: `280px` de alto en desktop, `240px` en táctil) — se prioriza esto sobre garantizar cero scroll en el caso límite absoluto.
+- [x] En desktop con ancho y alto suficientes, el `canvas` de los 4 juegos conserva su tamaño nativo (800×600 / 480×600 / 600×600); el marco `.crt-screen` ya no fuerza un `aspect-ratio: 4/3` fijo (cambio intencional: el marco ahora siempre se ajusta al tamaño real del `canvas`, en vez de reservar espacio vacío alrededor de los canvas que no son 4:3).
+- [x] `app/game-engines/registry.ts` expone `TouchControlsSchema`/`JoystickMapping`/`ActionButtonMapping` y cada entrada de `GAME_ENGINES` (`asteroids`, `tetris`, `arkanoid`, `snake`) incluye su `touchControls` con el mapeo definido en el Modelo de datos.
+- [x] Ninguno de los archivos `app/game-engines/{asteroids,tetris,arkanoid,snake}/engine.ts` se modifica como parte de este spec.
+- [x] En un dispositivo/emulador táctil (`pointer: coarse`), `/game/[id]/play` muestra el panel `TouchControls` debajo del `crt`, con joystick + hasta 2 botones de acción (deshabilitados visualmente si el juego no los mapea) + PAUSA + FIN + REGRESAR.
+- [x] En desktop (sin `pointer: coarse`), el panel `TouchControls` no se renderiza.
+- [x] **Asteroids táctil**: el joystick izquierda/derecha rota la nave, arriba activa el empuje, y el botón de acción dispara — mismo efecto que `←`/`→`/`↑`/`Espacio` en desktop.
+- [x] **Tetris táctil**: el joystick izquierda/derecha mueve la pieza, abajo hace caída suave; un botón de acción rota la pieza y el otro ejecuta caída instantánea — mismo efecto que sus teclas equivalentes en desktop.
+- [x] **Arkanoid táctil**: el joystick izquierda/derecha mueve la paleta — mismo efecto que `←`/`→` en desktop; los dos botones de acción se muestran deshabilitados (sin función).
+- [x] **Snake táctil**: el joystick en sus 4 direcciones controla el movimiento de la serpiente — mismo efecto que flechas/WASD en desktop; los dos botones de acción se muestran deshabilitados (sin función).
+- [x] En táctil, el botón PAUSA del panel pausa/reanuda el juego real (mismo `pause()`/`resume()` que el botón "PAUSA" del HUD superior en desktop).
+- [x] En táctil, el botón FIN del panel termina la partida manualmente, mostrando el modal "FIN DEL JUEGO" — mismo comportamiento que el botón "FIN" del HUD superior en desktop.
+- [x] En táctil, el botón REGRESAR del panel navega a `/game/[id]` — mismo destino que el botón "SALIR" del HUD superior en desktop.
+- [x] En táctil (altura de viewport normal), el `player-hud` superior se compacta en una sola fila delgada con stats abreviadas (Jugador/Puntuación/Vidas/Nivel) y el selector de skin reducido; los botones PAUSA/FIN/SALIR quedan ocultos.
+- [x] En táctil con viewport de altura muy reducida (`max-height: 500px`, ej. teléfono en landscape), el `player-hud` no se renderiza en absoluto.
+- [x] En desktop, el `player-hud` superior se ve exactamente igual que hoy (stats + selector de skin + PAUSA/FIN/SALIR, sin compactar).
+- [x] En táctil, `components/Nav.tsx` no se renderiza en `/game/[id]/play`; en cualquier otra ruta, o en desktop, el Nav se comporta exactamente igual que hoy.
+- [x] Los elementos táctiles del panel (joystick, botones) tienen una hitbox de al menos ~44px, apta para el dedo.
+- [x] El resto del catálogo, el guardado de puntuación, y el salón de la fama no presentan regresiones.
+- [x] `npm run build` compila sin errores de TypeScript ni de ESLint.
 
 ## Decisiones tomadas y descartadas
 

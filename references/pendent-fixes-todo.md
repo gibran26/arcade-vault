@@ -37,6 +37,29 @@ dejó pendiente.
   catch-up de golpe.
 - **Estado:** abierto.
 
+### Asteroids: fin de partida instantáneo ocasional al cargar la partida
+
+- **Detectado en:** spec `10-controles-tactiles-moviles`, Paso 8 (verificación manual final),
+  22/07/2026.
+- **Archivo:** `app/game-engines/asteroids/engine.ts`.
+- **Síntoma:** al cargar `/game/asteroids/play`, ocasionalmente la partida termina de inmediato
+  (modal "FIN DEL JUEGO" con puntuación 0) sin interacción del jugador. Muy poco frecuente:
+  reproducido 1 vez en ~8 cargas durante la verificación de este spec; 6 recargas consecutivas
+  inmediatas después no lo reprodujeron.
+- **No es el mismo bug que el de Snake** (ver entrada anterior): `loop()` en este motor **sí**
+  limita el `dt` por frame (`Math.min((ts - lastTime) / 1000, 0.05)`,
+  `app/game-engines/asteroids/engine.ts:657`), así que no puede haber un "salto" grande de física
+  por un frame retrasado. La causa raíz aquí no se investigó a fondo — hipótesis sin confirmar:
+  colisión de spawn (un asteroide inicial aparece encima o muy cerca de la nave antes de que el
+  período de invencibilidad inicial (`invincible`) la proteja). No se profundizó más por el bajo
+  alcance de este spec (prohíbe tocar `engine.ts`) y la baja frecuencia de reproducción.
+- **Por qué queda fuera de esta spec:** mismo motivo que la entrada de Snake — no se permite tocar
+  `engine.ts` en `10-controles-tactiles-moviles`.
+- **Sugerencia de investigación (no aplicada):** revisar la posición/velocidad inicial de los
+  asteroides generados en `initGame()` respecto a la posición de spawn de la nave, y la duración
+  de `invincible`, para descartar o confirmar la hipótesis de colisión de spawn.
+- **Estado:** abierto.
+
 ## ✅ Resueltos
 
 _(vacío por ahora)_

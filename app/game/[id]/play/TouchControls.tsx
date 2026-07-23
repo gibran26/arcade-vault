@@ -69,9 +69,10 @@ export default function TouchControls({
   const activeCodes = useRef<Map<number, string>>(new Map());
 
   useEffect(() => {
+    const codes = activeCodes.current;
     return () => {
-      activeCodes.current.forEach((code) => dispatchKey('keyup', code));
-      activeCodes.current.clear();
+      codes.forEach((code) => dispatchKey('keyup', code));
+      codes.clear();
     };
   }, []);
 
