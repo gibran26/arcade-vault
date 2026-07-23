@@ -55,8 +55,40 @@ const ACTION_ICONS: Record<ActionButtonMapping['icon'], ReactElement> = {
 const DIRECTIONS: Direction[] = ['up', 'down', 'left', 'right'];
 const ACTION_SLOTS = ['buttonA', 'buttonB'] as const;
 
+// Fracción del radio del joystick que hay que recorrer antes de
+// registrar una dirección, para evitar disparos por micro-temblores.
+const DEAD_ZONE_RATIO = 0.35;
+
 function dispatchKey(type: 'keydown' | 'keyup', code: string) {
   window.dispatchEvent(new KeyboardEvent(type, { code, bubbles: true }));
+}
+
+function directionsFromVector(
+  dx: number,
+  dy: number,
+  radius: number,
+  schema: TouchControlsSchema,
+): Direction[] {
+  const deadZone = radius * DEAD_ZONE_RATIO;
+  if (schema.directions === 8) {
+    const dirs: Direction[] = [];
+    if (dx > deadZone) dirs.push('right');
+    if (dx < -deadZone) dirs.push('left');
+    if (dy > deadZone) dirs.push('down');
+    if (dy < -deadZone) dirs.push('up');
+    return dirs;
+  }
+  const distance = Math.hypot(dx, dy);
+  if (distance < deadZone) return [];
+  return [
+    Math.abs(dx) >= Math.abs(dy)
+      ? dx > 0
+        ? 'right'
+        : 'left'
+      : dy > 0
+        ? 'down'
+        : 'up',
+  ];
 }
 
 export default function TouchControls({
@@ -67,12 +99,20 @@ export default function TouchControls({
   onExit,
 }: TouchControlsProps) {
   const activeCodes = useRef<Map<number, string>>(new Map());
+  const joystickPointerId = useRef<number | null>(null);
+  const joystickCenter = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const joystickCodes = useRef<Set<string>>(new Set());
+  const baseRef = useRef<HTMLDivElement | null>(null);
+  const knobRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const codes = activeCodes.current;
+    const jCodes = joystickCodes.current;
     return () => {
       codes.forEach((code) => dispatchKey('keyup', code));
       codes.clear();
+      jCodes.forEach((code) => dispatchKey('keyup', code));
+      jCodes.clear();
     };
   }, []);
 
@@ -101,6 +141,72 @@ export default function TouchControls({
     releasePointer(e.pointerId);
   };
 
+  const setKnobOffset = (x: number, y: number) => {
+    if (knobRef.current) {
+      knobRef.current.style.transform = `translate(${x}px, ${y}px)`;
+    }
+  };
+
+  const updateJoystickDirections = (dx: number, dy: number, radius: number) => {
+    const dirs = directionsFromVector(dx, dy, radius, schema);
+    const codes = new Set(
+      dirs.map((d) => schema.joystick[d]).filter((c): c is string => !!c),
+    );
+    joystickCodes.current.forEach((code) => {
+      if (!codes.has(code)) dispatchKey('keyup', code);
+    });
+    codes.forEach((code) => {
+      if (!joystickCodes.current.has(code)) dispatchKey('keydown', code);
+    });
+    joystickCodes.current = codes;
+  };
+
+  const releaseJoystick = () => {
+    joystickCodes.current.forEach((code) => dispatchKey('keyup', code));
+    joystickCodes.current.clear();
+    joystickPointerId.current = null;
+    setKnobOffset(0, 0);
+  };
+
+  const handleJoystickDown = (e: PointerEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const base = baseRef.current;
+    if (!base) return;
+    const rect = base.getBoundingClientRect();
+    joystickCenter.current = {
+      x: rect.left + rect.width / 2,
+      y: rect.top + rect.height / 2,
+    };
+    joystickPointerId.current = e.pointerId;
+    try {
+      base.setPointerCapture(e.pointerId);
+    } catch {
+      // Igual que en los botones: el fallback de pointerup/cancel libera el stick.
+    }
+    handleJoystickMove(e);
+  };
+
+  const handleJoystickMove = (e: PointerEvent<HTMLDivElement>) => {
+    if (joystickPointerId.current !== e.pointerId) return;
+    e.preventDefault();
+    const base = baseRef.current;
+    if (!base) return;
+    const radius = base.clientWidth / 2;
+    const knobRadius = (knobRef.current?.offsetWidth ?? radius) / 2;
+    const maxTravel = Math.max(radius - knobRadius, 1);
+    const dx = e.clientX - joystickCenter.current.x;
+    const dy = e.clientY - joystickCenter.current.y;
+    const distance = Math.hypot(dx, dy);
+    const clampedScale = distance > maxTravel ? maxTravel / distance : 1;
+    setKnobOffset(dx * clampedScale, dy * clampedScale);
+    updateJoystickDirections(dx, dy, radius);
+  };
+
+  const handleJoystickUp = (e: PointerEvent<HTMLDivElement>) => {
+    if (joystickPointerId.current !== e.pointerId) return;
+    releaseJoystick();
+  };
+
   const activeActions = ACTION_SLOTS.filter((slot) => schema[slot]);
 
   return (
@@ -108,38 +214,38 @@ export default function TouchControls({
       <div
         className={`touch-controls-main${activeActions.length === 0 ? ' touch-controls-main-solo' : ''}`}
       >
-        <div className="touch-joystick" role="group" aria-label="Direccional">
-          <div className="touch-joystick-base">
-            {DIRECTIONS.map((dir) => {
-              const code = schema.joystick[dir];
-              return (
-                <button
+        <div
+          ref={baseRef}
+          className="touch-joystick-base"
+          role="group"
+          aria-label="Direccional"
+          style={{ touchAction: 'none' }}
+          onPointerDown={handleJoystickDown}
+          onPointerMove={handleJoystickMove}
+          onPointerUp={handleJoystickUp}
+          onPointerLeave={handleJoystickUp}
+          onPointerCancel={handleJoystickUp}
+        >
+          {DIRECTIONS.map(
+            (dir) =>
+              schema.joystick[dir] && (
+                <svg
                   key={dir}
-                  type="button"
-                  className={`touch-joystick-zone touch-joystick-${dir}`}
-                  disabled={!code}
-                  aria-label={dir}
-                  style={{ touchAction: 'none' }}
-                  onPointerDown={handlePress(code)}
-                  onPointerUp={handleRelease}
-                  onPointerLeave={handleRelease}
-                  onPointerCancel={handleRelease}
+                  className={`touch-joystick-hint touch-joystick-hint-${dir}`}
+                  viewBox="0 0 24 24"
+                  width="14"
+                  height="14"
+                  aria-hidden="true"
                 >
-                  {code && (
-                    <svg
-                      viewBox="0 0 24 24"
-                      width="16"
-                      height="16"
-                      aria-hidden="true"
-                    >
-                      <path d={JOYSTICK_ARROW[dir]} fill="currentColor" />
-                    </svg>
-                  )}
-                </button>
-              );
-            })}
-            <div className="touch-joystick-knob" aria-hidden="true" />
-          </div>
+                  <path d={JOYSTICK_ARROW[dir]} fill="currentColor" />
+                </svg>
+              ),
+          )}
+          <div
+            ref={knobRef}
+            className="touch-joystick-knob"
+            aria-hidden="true"
+          />
         </div>
 
         {activeActions.length > 0 && (
