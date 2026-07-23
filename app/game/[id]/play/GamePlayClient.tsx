@@ -12,12 +12,15 @@ import {
   type SkinName,
 } from '@/app/game-engines/skins';
 import { saveScore } from '@/app/lib/supabase/actions';
+import { useTouchDevice } from '@/app/lib/use-touch-device';
 import type { Game } from '@/app/data/types';
+import TouchControls from './TouchControls';
 
 export default function GamePlayClient({ game }: { game: Game }) {
   const router = useRouter();
   const { user } = useAuth();
   const entry = GAME_ENGINES[game.id];
+  const isTouch = useTouchDevice();
 
   const [score, setScore] = useState(0);
   const [lives, setLives] = useState(3);
@@ -98,24 +101,41 @@ export default function GamePlayClient({ game }: { game: Game }) {
 
   return (
     <div className="av-player fade-in" data-skin={skin}>
-      <div className="player-hud">
-        <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
-          <div className="hud-stat">
-            <div className="l">Jugador</div>
+      <div className={`player-hud${isTouch ? ' player-hud-touch' : ''}`}>
+        <div
+          style={{
+            display: 'flex',
+            gap: isTouch ? 6 : 24,
+            flexWrap: isTouch ? 'nowrap' : 'wrap',
+          }}
+        >
+          <div className="hud-stat name">
+            <div className="l">{isTouch ? 'JUG' : 'Jugador'}</div>
             <div className="v" style={{ color: 'var(--ink)' }}>
               {name}
             </div>
           </div>
           <div className="hud-stat">
-            <div className="l">Puntuación</div>
+            <div className="l">{isTouch ? 'PTS' : 'Puntuación'}</div>
             <div className="v">{score.toLocaleString('es-ES')}</div>
           </div>
           <div className="hud-stat lives">
-            <div className="l">Vidas</div>
-            <div className="v">{'♥ '.repeat(lives).trim() || '—'}</div>
+            <div className="l">{isTouch ? 'VIDA' : 'Vidas'}</div>
+            <div className="v">
+              {lives <= 0 ? (
+                '—'
+              ) : isTouch ? (
+                <span className="lives-compact">
+                  <span>♥</span>
+                  <span>X{lives}</span>
+                </span>
+              ) : (
+                '♥ '.repeat(lives).trim()
+              )}
+            </div>
           </div>
           <div className="hud-stat level">
-            <div className="l">Nivel</div>
+            <div className="l">{isTouch ? 'NV' : 'Nivel'}</div>
             <div className="v">{String(level).padStart(2, '0')}</div>
           </div>
         </div>
@@ -134,18 +154,22 @@ export default function GamePlayClient({ game }: { game: Game }) {
               ))}
             </select>
           )}
-          <button className="btn yellow" onClick={togglePause}>
-            {paused ? 'REANUDAR' : 'PAUSA'}
-          </button>
-          <button className="btn magenta" onClick={endGame}>
-            FIN
-          </button>
-          <button
-            className="btn ghost"
-            onClick={() => router.push(`/game/${game.id}`)}
-          >
-            SALIR
-          </button>
+          {!isTouch && (
+            <>
+              <button className="btn yellow" onClick={togglePause}>
+                {paused ? 'REANUDAR' : 'PAUSA'}
+              </button>
+              <button className="btn magenta" onClick={endGame}>
+                FIN
+              </button>
+              <button
+                className="btn ghost"
+                onClick={() => router.push(`/game/${game.id}`)}
+              >
+                SALIR
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -182,6 +206,16 @@ export default function GamePlayClient({ game }: { game: Game }) {
           <span>CARGA · 1MB</span>
         </div>
       </div>
+
+      {isTouch && entry.touchControls && (
+        <TouchControls
+          schema={entry.touchControls}
+          paused={paused}
+          onTogglePause={togglePause}
+          onFinish={endGame}
+          onExit={() => router.push(`/game/${game.id}`)}
+        />
+      )}
 
       {over && (
         <div className="modal-bd">

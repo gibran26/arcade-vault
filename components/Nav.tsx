@@ -1,30 +1,36 @@
-"use client";
+'use client';
 
-import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { useState } from "react";
-import { useAuth } from "@/app/context/auth-context";
+import Link from 'next/link';
+import { usePathname, useRouter } from 'next/navigation';
+import { useState } from 'react';
+import { useAuth } from '@/app/context/auth-context';
+import { useTouchDevice } from '@/app/lib/use-touch-device';
+
+const GAME_PLAY_ROUTE = /^\/game\/[^/]+\/play$/;
 
 export default function Nav() {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
   const { user, signOut } = useAuth();
+  const isTouch = useTouchDevice();
 
-  const isActive = (section: "inicio" | "biblioteca" | "salon" | "about" | "auth") => {
-    if (section === "inicio") {
-      return pathname === "/";
+  const isActive = (
+    section: 'inicio' | 'biblioteca' | 'salon' | 'about' | 'auth',
+  ) => {
+    if (section === 'inicio') {
+      return pathname === '/';
     }
-    if (section === "biblioteca") {
-      return pathname === "/games" || pathname.startsWith("/game/");
+    if (section === 'biblioteca') {
+      return pathname === '/games' || pathname.startsWith('/game/');
     }
-    if (section === "salon") {
-      return pathname === "/hall-of-fame";
+    if (section === 'salon') {
+      return pathname === '/hall-of-fame';
     }
-    if (section === "about") {
-      return pathname === "/about";
+    if (section === 'about') {
+      return pathname === '/about';
     }
-    return pathname === "/auth";
+    return pathname === '/auth';
   };
 
   const close = () => setOpen(false);
@@ -33,6 +39,10 @@ export default function Nav() {
     signOut();
     close();
   };
+
+  if (isTouch && GAME_PLAY_ROUTE.test(pathname)) {
+    return null;
+  }
 
   return (
     <>
@@ -44,16 +54,22 @@ export default function Nav() {
           </div>
         </Link>
         <div className="links">
-          <Link href="/" className={isActive("inicio") ? "active" : ""}>
+          <Link href="/" className={isActive('inicio') ? 'active' : ''}>
             Inicio
           </Link>
-          <Link href="/games" className={isActive("biblioteca") ? "active" : ""}>
+          <Link
+            href="/games"
+            className={isActive('biblioteca') ? 'active' : ''}
+          >
             Biblioteca
           </Link>
-          <Link href="/hall-of-fame" className={isActive("salon") ? "active" : ""}>
+          <Link
+            href="/hall-of-fame"
+            className={isActive('salon') ? 'active' : ''}
+          >
             Salón de la Fama
           </Link>
-          <Link href="/about" className={isActive("about") ? "active" : ""}>
+          <Link href="/about" className={isActive('about') ? 'active' : ''}>
             Acerca de
           </Link>
         </div>
@@ -67,37 +83,74 @@ export default function Nav() {
             {user.name} ▾
           </button>
         ) : (
-          <button className="btn auth-btn" onClick={() => router.push("/auth")}>
+          <button className="btn auth-btn" onClick={() => router.push('/auth')}>
             Iniciar Sesión
           </button>
         )}
-        <button className="btn ghost hamburger" onClick={() => setOpen(true)} aria-label="Menú">
+        <button
+          className="btn ghost hamburger"
+          onClick={() => setOpen(true)}
+          aria-label="Menú"
+        >
           ≡
         </button>
       </nav>
 
-      <div className={"av-mobile-backdrop" + (open ? " open" : "")} onClick={close}></div>
-      <aside className={"av-mobile-panel" + (open ? " open" : "")}>
-        <div className="pixel neon-cyan" style={{ fontSize: 11, marginBottom: 16 }}>
+      <div
+        className={'av-mobile-backdrop' + (open ? ' open' : '')}
+        onClick={close}
+      ></div>
+      <aside className={'av-mobile-panel' + (open ? ' open' : '')}>
+        <div
+          className="pixel neon-cyan"
+          style={{ fontSize: 11, marginBottom: 16 }}
+        >
           MENÚ
         </div>
-        <Link href="/" className={isActive("inicio") ? "active" : ""} onClick={close}>
+        <Link
+          href="/"
+          className={isActive('inicio') ? 'active' : ''}
+          onClick={close}
+        >
           Inicio
         </Link>
-        <Link href="/games" className={isActive("biblioteca") ? "active" : ""} onClick={close}>
+        <Link
+          href="/games"
+          className={isActive('biblioteca') ? 'active' : ''}
+          onClick={close}
+        >
           Biblioteca
         </Link>
-        <Link href="/hall-of-fame" className={isActive("salon") ? "active" : ""} onClick={close}>
+        <Link
+          href="/hall-of-fame"
+          className={isActive('salon') ? 'active' : ''}
+          onClick={close}
+        >
           Salón de la Fama
         </Link>
-        <Link href="/about" className={isActive("about") ? "active" : ""} onClick={close}>
+        <Link
+          href="/about"
+          className={isActive('about') ? 'active' : ''}
+          onClick={close}
+        >
           Acerca de
         </Link>
-        <Link href="/auth" className={isActive("auth") ? "active" : ""} onClick={close}>
-          {user ? "Cuenta" : "Iniciar Sesión"}
+        <Link
+          href="/auth"
+          className={isActive('auth') ? 'active' : ''}
+          onClick={close}
+        >
+          {user ? 'Cuenta' : 'Iniciar Sesión'}
         </Link>
         <div style={{ flex: 1 }}></div>
-        <div className="pixel" style={{ fontSize: 9, color: "var(--ink-faint)", letterSpacing: "0.16em" }}>
+        <div
+          className="pixel"
+          style={{
+            fontSize: 9,
+            color: 'var(--ink-faint)',
+            letterSpacing: '0.16em',
+          }}
+        >
           CRÉDITOS · 03
         </div>
       </aside>
