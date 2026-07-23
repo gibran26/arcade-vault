@@ -1680,6 +1680,15 @@ a {
   outline: 0;
   font-family: var(--mono);
 }
+@media (max-width: 480px) {
+  .modal .input-row {
+    flex-direction: column;
+  }
+  .modal .input-row input,
+  .modal .input-row .btn {
+    width: 100%;
+  }
+}
 .modal .input-row input:focus {
   border-color: var(--cyan);
   box-shadow: 0 0 10px rgba(0, 245, 255, 0.35);
