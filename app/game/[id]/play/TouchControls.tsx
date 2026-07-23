@@ -86,9 +86,14 @@ export default function TouchControls({
     (code: string | undefined) => (e: PointerEvent<HTMLButtonElement>) => {
       if (!code) return;
       e.preventDefault();
-      e.currentTarget.setPointerCapture(e.pointerId);
       activeCodes.current.set(e.pointerId, code);
       dispatchKey('keydown', code);
+      try {
+        e.currentTarget.setPointerCapture(e.pointerId);
+      } catch {
+        // Algunos entornos no reconocen el pointerId como activo; el
+        // fallback de pointerup/pointerleave/pointercancel sigue liberando la tecla.
+      }
     };
 
   const handleRelease = (e: PointerEvent<HTMLButtonElement>) => {

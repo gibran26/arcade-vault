@@ -1035,19 +1035,48 @@ a {
 /* ===== player ===== */
 .av-player {
   max-width: 1100px;
-  margin: 32px auto;
-  padding: 0 24px 64px;
+  margin: 20px auto;
+  padding: 0 24px 24px;
 }
 .player-hud {
   display: flex;
   gap: 16px;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 18px;
+  padding: 10px 18px;
   border: 1px solid var(--line);
   background: var(--bg-2);
-  margin-bottom: 18px;
+  margin-bottom: 10px;
   flex-wrap: wrap;
+}
+.player-hud-touch {
+  padding: 8px 12px;
+  gap: 8px;
+  margin-bottom: 12px;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+}
+.player-hud-touch .hud-stat {
+  gap: 2px;
+}
+.player-hud-touch .hud-stat .l {
+  font-size: 7px;
+}
+.player-hud-touch .hud-stat .v {
+  font-size: 12px;
+}
+.player-hud-touch .hud-actions {
+  gap: 6px;
+}
+.player-hud-touch .hud-skins {
+  padding: 6px 20px 6px 10px;
+  font-size: 7px;
+  margin-right: 0;
+}
+@media (pointer: coarse) and (max-height: 500px) {
+  .player-hud {
+    display: none;
+  }
 }
 .hud-stat {
   display: flex;
@@ -1165,7 +1194,7 @@ a {
   position: relative;
   border-radius: 28px;
   background: #050507;
-  padding: 24px;
+  padding: 16px;
   box-shadow:
     0 0 0 6px #1b1b22,
     0 0 0 7px #2a2a35,
@@ -1185,7 +1214,10 @@ a {
 }
 .crt-screen {
   position: relative;
-  aspect-ratio: 4 / 3;
+  aspect-ratio: auto;
+  width: fit-content;
+  max-width: 100%;
+  margin: 0 auto;
   background: #000;
   border-radius: 12px / 28px;
   overflow: hidden;
@@ -1199,7 +1231,14 @@ a {
 .crt-screen canvas {
   display: block;
   max-width: 100%;
+  width: auto;
   height: auto;
+  max-height: max(calc(100vh - 345px), 280px);
+}
+@media (pointer: coarse) {
+  .crt-screen canvas {
+    max-height: max(calc(100vh - 520px), 240px);
+  }
 }
 .crt-screen::after {
   content: '';
@@ -1239,7 +1278,7 @@ a {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-top: 14px;
+  margin-top: 8px;
   padding: 0 8px;
   font-family: var(--pixel);
   font-size: 8px;
@@ -1909,9 +1948,6 @@ a {
   }
   .crt {
     padding: 12px;
-  }
-  .crt-screen {
-    aspect-ratio: auto;
   }
   .crt-bottom {
     padding: 0 4px;
