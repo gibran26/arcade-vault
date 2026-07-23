@@ -1196,6 +1196,11 @@ a {
   align-items: center;
   justify-content: center;
 }
+.crt-screen canvas {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
 .crt-screen::after {
   content: '';
   position: absolute;
@@ -1764,6 +1769,15 @@ a {
   }
   .av-player {
     padding: 0 16px 32px;
+  }
+  .crt {
+    padding: 12px;
+  }
+  .crt-screen {
+    aspect-ratio: auto;
+  }
+  .crt-bottom {
+    padding: 0 4px;
   }
 }
 
