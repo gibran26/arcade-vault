@@ -105,11 +105,11 @@ export default function GamePlayClient({ game }: { game: Game }) {
         <div
           style={{
             display: 'flex',
-            gap: isTouch ? 10 : 24,
+            gap: isTouch ? 6 : 24,
             flexWrap: isTouch ? 'nowrap' : 'wrap',
           }}
         >
-          <div className="hud-stat">
+          <div className="hud-stat name">
             <div className="l">{isTouch ? 'JUG' : 'Jugador'}</div>
             <div className="v" style={{ color: 'var(--ink)' }}>
               {name}
@@ -121,7 +121,18 @@ export default function GamePlayClient({ game }: { game: Game }) {
           </div>
           <div className="hud-stat lives">
             <div className="l">{isTouch ? 'VIDA' : 'Vidas'}</div>
-            <div className="v">{'♥ '.repeat(lives).trim() || '—'}</div>
+            <div className="v">
+              {lives <= 0 ? (
+                '—'
+              ) : isTouch ? (
+                <span className="lives-compact">
+                  <span>♥</span>
+                  <span>X{lives}</span>
+                </span>
+              ) : (
+                '♥ '.repeat(lives).trim()
+              )}
+            </div>
           </div>
           <div className="hud-stat level">
             <div className="l">{isTouch ? 'NV' : 'Nivel'}</div>

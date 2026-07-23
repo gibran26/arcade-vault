@@ -101,9 +101,13 @@ export default function TouchControls({
     releasePointer(e.pointerId);
   };
 
+  const activeActions = ACTION_SLOTS.filter((slot) => schema[slot]);
+
   return (
     <div className="touch-controls">
-      <div className="touch-controls-main">
+      <div
+        className={`touch-controls-main${activeActions.length === 0 ? ' touch-controls-main-solo' : ''}`}
+      >
         <div className="touch-joystick" role="group" aria-label="Direccional">
           <div className="touch-joystick-base">
             {DIRECTIONS.map((dir) => {
@@ -138,28 +142,29 @@ export default function TouchControls({
           </div>
         </div>
 
-        <div className="touch-actions">
-          {ACTION_SLOTS.map((slot) => {
-            const mapping = schema[slot];
-            return (
-              <button
-                key={slot}
-                type="button"
-                className="touch-action-btn"
-                disabled={!mapping}
-                aria-label={mapping?.label ?? 'Sin función'}
-                style={{ touchAction: 'none' }}
-                onPointerDown={handlePress(mapping?.code)}
-                onPointerUp={handleRelease}
-                onPointerLeave={handleRelease}
-                onPointerCancel={handleRelease}
-              >
-                {mapping && ACTION_ICONS[mapping.icon]}
-                <span>{mapping?.label ?? '—'}</span>
-              </button>
-            );
-          })}
-        </div>
+        {activeActions.length > 0 && (
+          <div className="touch-actions">
+            {activeActions.map((slot) => {
+              const mapping = schema[slot];
+              return (
+                <button
+                  key={slot}
+                  type="button"
+                  className="touch-action-btn"
+                  aria-label={mapping?.label}
+                  style={{ touchAction: 'none' }}
+                  onPointerDown={handlePress(mapping?.code)}
+                  onPointerUp={handleRelease}
+                  onPointerLeave={handleRelease}
+                  onPointerCancel={handleRelease}
+                >
+                  {mapping && ACTION_ICONS[mapping.icon]}
+                  <span>{mapping?.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       <div className="touch-utility">
