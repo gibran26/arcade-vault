@@ -60,6 +60,49 @@ dejó pendiente.
   de `invincible`, para descartar o confirmar la hipótesis de colisión de spawn.
 - **Estado:** abierto.
 
+### Arkanoid: los primeros sonidos no suenan en móvil (bloqueados por la política de autoplay), lo que se percibe como desfase
+
+- **Detectado en:** spec `10-controles-tactiles-moviles`, verificación manual con el HUD táctil,
+  22/07/2026 (reportado por el usuario en una conversación posterior; documentado el 23/07/2026
+  tras perder el detalle exacto por un `/clear` de sesión, y **validado y reproducido el
+  23/07/2026** con Playwright emulando un dispositivo móvil real — ver evidencia abajo).
+- **Archivo:** `app/game-engines/arkanoid/engine.ts`, función `update()` (líneas ~495, 500, 505,
+  517 y 534, cada llamada a `(bounceSound.cloneNode() as HTMLAudioElement).play()` /
+  `(breakSound.cloneNode() as HTMLAudioElement).play()`).
+- **Síntoma reportado:** jugando en modo móvil (controles táctiles), el sonido de rebote y de
+  rotura de bloque suena "desfasado" respecto al choque en pantalla.
+- **Causa raíz confirmada (no solo hipótesis):** `GamePlayClient.tsx` arranca el motor
+  automáticamente al montar (`useEffect` → `startEngine()`, sin ningún gate de "toca para
+  empezar"), así que la pelota empieza a rebotar y a llamar `.play()` **antes de que el usuario
+  haya interactuado con la página**. Los navegadores móviles bloquean el autoplay de audio sin
+  gesto previo del usuario: esas primeras llamadas a `.play()` son rechazadas con
+  `NotAllowedError` — **sin sonido y sin que se maneje el rechazo** (no hay `.catch()` en el
+  código), lo que además genera un `unhandledrejection` en cada colisión previa al primer toque.
+  En cuanto el usuario toca la pantalla (gesto real), el navegador desbloquea el audio y los
+  sonidos posteriores sí suenan con normalidad. El resultado percibido es justo un "desfase": las
+  primeras colisiones son mudas y el sonido "aparece" recién con el primer toque, dando la
+  sensación de que el audio va retrasado respecto a la acción.
+  - _Se descarta_ la hipótesis inicial de latencia de decodificación de audio en hardware móvil
+    (`cloneNode()` por colisión): una vez desbloqueado el audio, el delay entre la llamada a
+    `.play()` y el evento `playing` medido fue de ~23 ms, imperceptible.
+  - **Evidencia:** contexto de Playwright con `isMobile: true`, `hasTouch: true`, viewport
+    390×844, navegando a `/game/arkanoid/play` sin ningún toque durante 6 s. Se capturaron 4
+    eventos `unhandledrejection`, todos `NotAllowedError: play() failed because the user didn't
+interact with the document first`. En una segunda prueba con un toque simulado a los ~4 s: 2
+    reproducciones rechazadas (`NotAllowedError`) antes del toque, y la reproducción posterior al
+    toque exitosa con 23 ms de latencia. Capturas en
+    `.playwright-screenshots/arkanoid-mobile-audio-test-phase1.png`,
+    `arkanoid-mobile-audio-test-phase2.png` y `arkanoid-mobile-no-gesture-6s.png`.
+- **Por qué queda fuera de esta spec:** `10-controles-tactiles-moviles` prohíbe explícitamente
+  tocar los `engine.ts` de los 4 juegos; corregir el manejo de audio es un cambio de lógica de
+  juego, no de controles táctiles ni de layout.
+- **Sugerencia de fix (no aplicada):** manejar la Promise de `.play()` con `.catch()` para evitar
+  el `unhandledrejection` (mínimo indispensable), y evaluar desbloquear el audio explícitamente en
+  el primer gesto del usuario (p. ej. un `<audio>` "silencioso" reproducido en el primer
+  `touchstart`/`pointerdown` de `TouchControls`, patrón estándar para políticas de autoplay
+  móviles) para que el primer rebote/rotura sí suene.
+- **Estado:** abierto (causa raíz confirmada).
+
 ## ✅ Resueltos
 
 _(vacío por ahora)_
