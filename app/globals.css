@@ -50,6 +50,18 @@ select {
   color: inherit;
 }
 
+/* iOS Safari y Chrome Android hacen zoom automático al enfocar un campo
+   de texto con font-size menor a 16px. Si el campo se desmonta antes de
+   perder el foco (ej. el input de iniciales al guardar la puntuación),
+   el navegador no revierte el zoom y la pantalla se queda ampliada.
+   Selectores de clase más específicos (.hud-skins, .av-search input,
+   etc.) siguen ganando la cascada y conservan su tamaño reducido. */
+input,
+textarea,
+select {
+  font-size: 16px;
+}
+
 a {
   color: inherit;
   text-decoration: none;
