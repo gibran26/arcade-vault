@@ -1,6 +1,6 @@
 # 10 — Controles táctiles y adaptación móvil
 
-**Estado:** Borrador
+**Estado:** Aprobado
 **Depende de:** 05-asteroids-motor-real, 07-tetris-motor-leaderboard, 08-arkanoid-motor-leaderboard, 09-snake-motor-leaderboard (registro `GAME_ENGINES` y los 4 motores ya existentes, que no se modifican por dentro)
 **Fecha:** 2026-07-22
 **Objetivo:** Hacer que los 4 juegos jugables (Asteroids, Tetris, Arkanoid, Snake) funcionen y se vean correctamente en dispositivos móviles táctiles, agregando un panel de controles táctiles genérico (joystick + botones de acción + pausa/fin/regresar) declarado por juego en `app/game-engines/registry.ts` —sin modificar el código interno de ningún `engine.ts`—, junto con el escalado responsive del canvas y la ocultación del Nav global durante la partida en viewports táctiles.
