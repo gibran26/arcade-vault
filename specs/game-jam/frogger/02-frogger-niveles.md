@@ -1,6 +1,6 @@
 # Integración de Frogger — variante niveles (motor + leaderboard)
 
-**Estado:** Borrador
+**Estado:** Implementado
 **Depende de:** 04-integracion-supabase (clientes de Supabase); consume la capa ya generalizada
 por 07-tetris-motor-leaderboard (`getGames`/`getGame`/`getScores`/`getStats`/`saveScore`,
 `GAME_ENGINES`) sin volver a generalizar nada.
@@ -310,69 +310,69 @@ sumergida` se anima con un parpadeo de opacidad perceptible (no un cambio de col
 
 ## Criterios de aceptación
 
-- [ ] La tabla `games` de Supabase contiene una fila `id: "frogger"`, `title: "FROGGER"`,
+- [x] La tabla `games` de Supabase contiene una fila `id: "frogger"`, `title: "FROGGER"`,
       `cat: "ARCADE"`, `cover: "cover-rana"`, `color: "green"`, sembrada por la migración.
-- [ ] `app/game-engines/frogger/engine.ts` existe, exporta `createGame(canvas, callbacks)` y no
+- [x] `app/game-engines/frogger/engine.ts` existe, exporta `createGame(canvas, callbacks)` y no
       usa variables globales de módulo.
-- [ ] `FroggerCallbacks` incluye `onScoreChange`, `onLivesChange`, `onGameOver`, `onPauseChange`,
+- [x] `FroggerCallbacks` incluye `onScoreChange`, `onLivesChange`, `onGameOver`, `onPauseChange`,
       `onLevelChange`, todos obligatorios, compatibles con `EngineCallbacks` de `registry.ts`.
-- [ ] En `/game/frogger/play` el juego se renderiza dentro de un `<canvas>` de 560×520 y es jugable
+- [x] En `/game/frogger/play` el juego se renderiza dentro de un `<canvas>` de 560×520 y es jugable
       con teclado: `←`/`→`/`↑`/`↓` y `WASD` mueven al sapo exactamente una celda por pulsación.
-- [ ] Aterrizar en un hueco de meta libre lo marca como ocupado (visualmente distinguible) y suma
+- [x] Aterrizar en un hueco de meta libre lo marca como ocupado (visualmente distinguible) y suma
       50 puntos; aterrizar en un hueco ya ocupado termina la partida (resta una vida).
-- [ ] Al ocupar los 5 huecos de meta, la ronda se completa: suma 1000 puntos, el nivel sube en 1
+- [x] Al ocupar los 5 huecos de meta, la ronda se completa: suma 1000 puntos, el nivel sube en 1
       (`onLevelChange`), los huecos se liberan, el sapo reaparece en la fila de salida, y la
       dificultad de la siguiente ronda aumenta (troncos/vehículos ~15% más rápidos, más carriles
       con tortugas sumergibles, temporizador ~2s más corto con piso de 15s).
-- [ ] Al menos un carril de río usa tortugas con ciclo visible `a flote → parpadeo de aviso →
+- [x] Al menos un carril de río usa tortugas con ciclo visible `a flote → parpadeo de aviso →
 sumergida`; el sapo sobre una tortuga en el instante en que se sumerge muere (resta una
       vida).
-- [ ] Una barra de temporizador visible en la franja superior del canvas se encoge durante cada
+- [x] Una barra de temporizador visible en la franja superior del canvas se encoge durante cada
       intento y no avanza mientras el juego está en pausa; agotarla resta una vida.
-- [ ] La partida arranca con 3 vidas (`onLivesChange(3)` al iniciar); cada muerte (vehículo, agua,
+- [x] La partida arranca con 3 vidas (`onLivesChange(3)` al iniciar); cada muerte (vehículo, agua,
       arrastre fuera de grilla, hueco ocupado, o temporizador agotado) resta una vida y, si quedan
       vidas, el sapo reaparece en la fila de salida conservando el puntaje y el progreso de huecos
       de meta ocupados en la ronda actual.
-- [ ] Cada 5000 puntos acumulados otorga una vida adicional, reflejada vía `onLivesChange`.
-- [ ] Cuando las vidas llegan a `0`, se invoca `onGameOver(finalScore)` una única vez, y React
+- [x] Cada 5000 puntos acumulados otorga una vida adicional, reflejada vía `onLivesChange`.
+- [x] Cuando las vidas llegan a `0`, se invoca `onGameOver(finalScore)` una única vez, y React
       muestra el modal "FIN DEL JUEGO" con el puntaje final.
-- [ ] El botón "PAUSA" del HUD de React y las teclas `P`/`Escape` capturadas por el engine
+- [x] El botón "PAUSA" del HUD de React y las teclas `P`/`Escape` capturadas por el engine
       detienen/reanudan el loop de animación real (troncos, vehículos, tortugas, temporizador y
       sapo), confirmando el estado vía `onPauseChange(isPaused)`.
-- [ ] Al presionar "JUGAR DE NUEVO", el engine se destruye y se vuelve a crear desde cero: sapo,
+- [x] Al presionar "JUGAR DE NUEVO", el engine se destruye y se vuelve a crear desde cero: sapo,
       huecos de meta, vidas (3), nivel (1) y puntaje (0) quedan en su estado inicial.
-- [ ] Salir de la partida (botón "SALIR" o navegación fuera de la página) limpia correctamente el
+- [x] Salir de la partida (botón "SALIR" o navegación fuera de la página) limpia correctamente el
       engine (`destroy()` se llama en el cleanup del `useEffect`, sin loops ni listeners de teclado
       colgando).
-- [ ] `app/game-engines/registry.ts` incluye la entrada `frogger: { createGame, width: 560, height:
+- [x] `app/game-engines/registry.ts` incluye la entrada `frogger: { createGame, width: 560, height:
 520 }`, sin modificar `app/game/[id]/play/page.tsx` ni `GamePlayClient.tsx`.
-- [ ] En `/game/frogger/play`, guardar la puntuación inserta una fila real en `scores`
+- [x] En `/game/frogger/play`, guardar la puntuación inserta una fila real en `scores`
       (`game_id: "frogger"`) vía `saveScore`, reutilizando la Server Action ya existente sin
       cambios.
-- [ ] En `/game/frogger`, el título, descripción, leaderboard lateral, "Mejor global" y "Partidas"
+- [x] En `/game/frogger`, el título, descripción, leaderboard lateral, "Mejor global" y "Partidas"
       provienen de Supabase vía `getGame`/`getScores`/`getStats`, sin cambios en esas funciones.
-- [ ] En `/hall-of-fame`, la pestaña "FROGGER" muestra las puntuaciones reales de `scores` para
+- [x] En `/hall-of-fame`, la pestaña "FROGGER" muestra las puntuaciones reales de `scores` para
       `game_id: "frogger"`.
-- [ ] El resto del catálogo (`asteroids`, `tetris`, `arkanoid`, `snake`) conserva exactamente su
+- [x] El resto del catálogo (`asteroids`, `tetris`, `arkanoid`, `snake`) conserva exactamente su
       comportamiento actual, sin regresiones.
-- [ ] Ningún elemento del tablero (sapo, troncos, tortugas, vehículos, césped, agua, carretera,
+- [x] Ningún elemento del tablero (sapo, troncos, tortugas, vehículos, césped, agua, carretera,
       huecos de meta) se dibuja como una única forma geométrica plana de un solo color; cada uno
       combina varias primitivas para sugerir textura o identidad, según lo descrito en el Alcance.
-- [ ] Los vehículos de las 5 filas de carretera incluyen autos (~1 celda) y camiones (~2 celdas),
+- [x] Los vehículos de las 5 filas de carretera incluyen autos (~1 celda) y camiones (~2 celdas),
       cada uno con carrocería, ventana, faros y ruedas distinguibles, y con un color propio que se
       distingue del de otros vehículos dentro del mismo carril.
-- [ ] La caja de colisión de cada vehículo corresponde a su longitud real dibujada (`lengthCells`):
+- [x] La caja de colisión de cada vehículo corresponde a su longitud real dibujada (`lengthCells`):
       un camión bloquea/mata en más celdas que un auto.
-- [ ] El sapo muestra ojos orientados según la dirección del último salto, y anima un
+- [x] El sapo muestra ojos orientados según la dirección del último salto, y anima un
       aplastado-estirado simple durante cada salto entre celdas.
-- [ ] El agua anima una ondulación (ripple) en bucle, la carretera muestra líneas discontinuas de
+- [x] El agua anima una ondulación (ripple) en bucle, la carretera muestra líneas discontinuas de
       carril, y el césped muestra una textura sutil distinguible de una franja sólida.
-- [ ] Las tortugas animan su transición `a flote → parpadeo de aviso → sumergida` con un cambio de
+- [x] Las tortugas animan su transición `a flote → parpadeo de aviso → sumergida` con un cambio de
       opacidad perceptible y un ligero hundimiento vertical, no un cambio de color instantáneo, y
       con un desfase de ciclo distinto entre carriles.
-- [ ] Los huecos de meta libres y ocupados son visualmente distinguibles entre sí (contorno vacío
+- [x] Los huecos de meta libres y ocupados son visualmente distinguibles entre sí (contorno vacío
       vs. silueta de sapo pequeño).
-- [ ] `npm run build` compila sin errores de TypeScript ni de ESLint.
+- [x] `npm run build` compila sin errores de TypeScript ni de ESLint.
 
 ## Decisiones tomadas y descartadas
 

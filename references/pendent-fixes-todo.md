@@ -103,6 +103,36 @@ interact with the document first`. En una segunda prueba con un toque simulado a
   móviles) para que el primer rebote/rotura sí suene.
 - **Estado:** abierto (causa raíz confirmada).
 
+### Frogger: framerate por debajo del resto del catálogo, más marcado en las skins con glow
+
+- **Detectado en:** spec `game-jam/frogger/02-frogger-niveles`, Fase D (validación con Playwright),
+  25/07/2026.
+- **Archivo:** `app/game-engines/frogger/engine.ts`, funciones `draw()`/`drawWaterAndLogs()`
+  (ripple del agua), `drawTurtleGroup()`, `drawVehicle()` y las llamadas a `ctx.shadowBlur` que
+  introdujo `skin-designer` para las skins `neon`/`retro`.
+- **Síntoma:** medido con `requestAnimationFrame` durante 3 s en `/game/frogger/play` (Playwright,
+  mismo entorno para las tres mediciones): **~45 fps en skin Clásico** y **~31 fps en Neon/Retro**,
+  frente a **60 fps estables** de `/game/snake/play` medidos en la misma sesión de navegador. El
+  framerate es estable (no fluctúa ni se degrada progresivamente durante la medición), solo más
+  bajo que el resto del catálogo.
+- **Causa raíz probable (no confirmada a fondo):** el motor ya precalcula en un `<canvas>`
+  offscreen las franjas estáticas (césped, líneas de carril, contorno de huecos de meta), tal como
+  pide el spec, pero el detalle dinámico por frame es más costoso que en los otros motores: el
+  ripple del agua traza ~70 puntos por línea × 3 líneas × 5 carriles con `lineTo`/`stroke`
+  independientes cada frame, y las skins `neon`/`retro` aplican `ctx.shadowBlur` (costoso en
+  Canvas2D) repetidamente por primitiva — troncos, tortugas, sapo y aro de los huecos de meta — en
+  vez de agrupar el glow en una sola pasada.
+- **Por qué queda fuera de esta spec:** `02-frogger-niveles` no fija un piso de fps en sus
+  criterios de aceptación (solo pide framerate "estable"), y el propio spec ya documentaba este
+  riesgo de antemano ("Costo de dibujo por frame por el mayor detalle visual") con la mitigación de
+  la franja estática offscreen, que sí está implementada. Optimizar más a fondo el dibujo dinámico
+  es trabajo adicional no comprometido en el plan de esta spec.
+- **Sugerencia de fix (no aplicada):** reducir la resolución de puntos del ripple (o cachear su
+  forma y solo desplazarla en vez de recalcular todos los `lineTo` cada frame), y en las skins con
+  glow aplicar `shadowBlur` una sola vez sobre una capa agrupada (o limitarlo a menos elementos) en
+  vez de por primitiva individual.
+- **Estado:** abierto.
+
 ## ✅ Resueltos
 
 _(vacío por ahora)_

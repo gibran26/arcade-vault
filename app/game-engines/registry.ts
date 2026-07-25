@@ -1,5 +1,6 @@
 import { createGame as arkanoidCreateGame } from './arkanoid/engine';
 import { createGame as asteroidsCreateGame } from './asteroids/engine';
+import { createGame as froggerCreateGame } from './frogger/engine';
 import { createGame as snakeCreateGame } from './snake/engine';
 import { createGame as tetrisCreateGame } from './tetris/engine';
 import { SKIN_ORDER, type SkinName } from './skins';
@@ -102,6 +103,23 @@ export const GAME_ENGINES: Record<string, EngineEntry> = {
         left: 'ArrowLeft',
         right: 'ArrowRight',
       },
+    },
+  },
+  frogger: {
+    createGame: froggerCreateGame,
+    width: 560,
+    height: 520,
+    skins: SKIN_ORDER,
+    touchControls: {
+      directions: 4,
+      joystick: {
+        up: 'ArrowUp',
+        down: 'ArrowDown',
+        left: 'ArrowLeft',
+        right: 'ArrowRight',
+      },
+      // sin buttonA/buttonB: el sapo solo se mueve, sin acciones adicionales
+      // (el panel renderiza solo el joystick, centrado, igual que arkanoid/snake)
     },
   },
 };
