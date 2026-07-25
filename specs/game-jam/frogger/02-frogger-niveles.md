@@ -9,9 +9,10 @@ mutuamente excluyentes, se implementa solo uno.
 **Fecha:** 2026-07-21
 **Objetivo:** Construir desde cero el motor de Frogger con rondas progresivas (3 vidas, 5 huecos de
 meta que hay que llenar por completo, temporizador por intento, tortugas que se sumergen y
-dificultad creciente por ronda) dentro de un `<canvas>` en `/game/frogger/play`, notificando a
-React los cambios de puntaje, vidas y nivel, y persistir sus puntuaciones vía la capa de datos
-genérica ya existente.
+dificultad creciente por ronda) dentro de un `<canvas>` en `/game/frogger/play`, dibujado con
+gráficos procedurales detallados (texturas y elementos identificables, sin sprites) y animaciones
+simples, notificando a React los cambios de puntaje, vidas y nivel, y persistir sus puntuaciones vía
+la capa de datos genérica ya existente.
 
 ## Alcance
 
@@ -22,14 +23,46 @@ genérica ya existente.
   `cat: "ARCADE"`, `cover: "cover-rana"`, `color: "green"`. Se suma a las filas ya existentes
   (`asteroids`, `tetris`, `arkanoid`, `snake`). Es la misma fila semilla que definiría la variante
   `core` — son alternativas del mismo `id`, no coexisten.
-- **Sin assets gráficos externos**: el sapo, los troncos, las tortugas, los vehículos y las
-  franjas de césped/agua/meta se dibujan con primitivas de canvas (rectángulos y círculos), usando
-  la paleta de colores neón ya definida en `globals.css` (variables `--cyan`/`--green`/
-  `--yellow`/`--magenta`) — mismo criterio que Tetris/Arkanoid dibujando sus piezas/bloques sin
-  sprites. Un pequeño indicador de tiempo restante (barra que se encoge) se dibuja directamente en
-  la franja superior del canvas, como único elemento de "HUD interno" — mismo patrón ya usado por
-  Tetris para su panel lateral, aquí reducido a un solo indicador porque score/vidas/nivel ya los
-  cubre el HUD de React.
+- **Sin assets gráficos externos, pero con detalle visual e identificable**: el sapo, los troncos,
+  las tortugas, los vehículos y las franjas de césped/agua/meta se dibujan con primitivas de canvas
+  (rectángulos, círculos y líneas combinados), usando la paleta de colores neón ya definida en
+  `globals.css` (variables `--cyan`/`--green`/`--yellow`/`--magenta`) — mismo criterio que
+  Tetris/Arkanoid dibujando sus piezas/bloques sin sprites, pero llevado a un nivel de detalle mayor
+  porque en Frogger cada elemento necesita leerse de un vistazo estando en movimiento. Ningún
+  elemento se limita a una única forma geométrica de color plano; cada uno combina varias primitivas
+  para sugerir textura o identidad:
+  - El **sapo** tiene ojos (círculos blancos con pupila) orientados hacia la dirección del último
+    salto y un contorno de patas visible; anima un "aplastado-estirado" simple (se achata al
+    despegar y se estira al aterrizar) durante cada salto discreto.
+  - Los **troncos** llevan líneas horizontales más oscuras (vetas de madera) y extremos
+    redondeados.
+  - Las **tortugas** muestran un caparazón con patrón segmentado (arcos o líneas concéntricas) y
+    una cabeza/aletas pequeñas que sobresalen del cuerpo; su ciclo `a flote → parpadeo de aviso →
+sumergida` se anima con un parpadeo de opacidad perceptible (no un cambio de color instantáneo)
+    y un ligero hundimiento vertical al sumergirse.
+  - El **agua** lleva líneas onduladas (ripple) que se desplazan lentamente en bucle sugiriendo
+    corriente, en vez de ser una franja plana de un solo color.
+  - El **césped** lleva una textura sutil (trazos cortos o puntos dispersos) que lo distingue de
+    una franja sólida.
+  - La **carretera** lleva líneas discontinuas de carril (guiones claros sobre fondo oscuro).
+  - Los **huecos de meta** se dibujan como un hueco vacío con contorno cuando están libres, y con
+    la silueta de un sapo pequeño (mismo estilo del sapo principal, reducido) cuando quedan
+    ocupados, para distinguirse claramente entre sí.
+
+  Un pequeño indicador de tiempo restante (barra que se encoge) se dibuja directamente en la franja
+  superior del canvas, como único elemento de "HUD interno" — mismo patrón ya usado por Tetris para
+  su panel lateral, aquí reducido a un solo indicador porque score/vidas/nivel ya los cubre el HUD
+  de React.
+
+- **Vehículos variados en color y longitud**: cada vehículo de las 5 filas de carretera es un auto
+  (más corto, ~1 celda de ancho) o un camión (más largo, ~2 celdas de ancho), con carrocería,
+  parabrisas/ventana (rectángulo de tono distinto), faros delanteros (dos círculos pequeños en el
+  frente) y ruedas (círculos oscuros en las esquinas inferiores) — nunca un bloque de color liso.
+  Cada vehículo recibe un color propio de una paleta variada (no limitada a los 4 colores neón del
+  resto del juego, para que los vehículos se distingan entre sí dentro de un mismo carril), y su
+  longitud (auto vs. camión) determina también su caja de colisión real: un camión ocupa y bloquea
+  más celdas que un auto. La proporción de autos vs. camiones y la mezcla de colores por carril se
+  genera de forma pseudoaleatoria al iniciar cada ronda.
 - **Motor construido desde cero** (sin `game.js` de referencia, igual que Snake) en
   `app/game-engines/frogger/engine.ts`, exponiendo `createGame(canvas, callbacks)` con
   `pause()`/`resume()`/`destroy()`, mismo patrón que `asteroids`/`tetris`/`arkanoid`/`snake`.
@@ -102,6 +135,13 @@ genérica ya existente.
 - Cambios visuales en `Podium.tsx`/`Leaderboard.tsx`/`GameCard.tsx`/`MiniCard`.
 - Adaptar cualquier otro juego de `references/started-games/` — este spec cubre únicamente esta
   variante de Frogger.
+- **Sprites, spritesheets o cualquier imagen externa**: el detalle visual descrito en el Alcance
+  (vetas, caparazones, ripple, faros, etc.) es enteramente procedural, generado con primitivas de
+  canvas en tiempo de dibujo — no se cargan ni se generan archivos de imagen.
+- **Efectos gráficos pesados**: sistemas de partículas, explosiones, sombras dinámicas o
+  post-procesado — el detalle visual se limita a composición de primitivas simples y las
+  animaciones descritas (salto del sapo, ripple del agua, parpadeo/hundimiento de tortugas), sin
+  motor de partículas ni efectos costosos de renderizar.
 - Diseño de un cover/gradiente nuevo — se reutiliza `cover-rana`, ya existente en `globals.css`
   (usada originalmente por la entrada mock "ranaria", nunca sembrada en Supabase).
 - Ajustes de responsive/CSS del contenedor `crt`/`crt-screen` para encajar un quinto tamaño de
@@ -140,7 +180,19 @@ genérica ya existente.
   arreglo de 5 huecos de meta con su estado `libre`/`ocupado`; los carriles de río marcados como
   "con tortugas" (con su ciclo `a flote → parpadeo → sumergida`) frente a los de tronco fijo; el
   contador de vidas y el nivel/ronda actual; el temporizador del intento (con su valor inicial y
-  reducción por ronda); y el umbral de vida extra por puntaje.
+  reducción por ronda); y el umbral de vida extra por puntaje. Además, para el detalle visual y las
+  animaciones descritas en el Alcance:
+
+  - Cada vehículo lleva `kind: 'car' | 'truck'`, `lengthCells` (`1` para auto, `2` para camión) y
+    `color` propio tomado de la paleta ampliada; su caja de colisión se deriva de `lengthCells`, no
+    de un ancho fijo.
+  - El estado del sapo incluye el progreso del salto en curso (`0`→`1`) y la dirección del último
+    salto, usados para la animación de aplastado-estirado y para orientar los ojos.
+  - Cada carril de río lleva una fase de ondulación (agua) o un offset de ciclo propio (tortugas),
+    para que la animación no se vea sincronizada entre carriles.
+  - Un `<canvas>` offscreen para las franjas estáticas (textura de césped, líneas de carril de la
+    carretera, contorno de los huecos de meta), dibujado una sola vez por franja y volcado sobre el
+    canvas visible en cada frame, evitando recalcular esa textura repetidamente.
 
   - `onScoreChange` se invoca en cada avance de fila (`+10`), en cada hueco de meta ocupado
     (`+50`), y en cada ronda completada (`+1000`).
@@ -189,17 +241,21 @@ genérica ya existente.
    movimiento, sapo con salto discreto y arrastre sobre troncos, y las cuatro condiciones de muerte
    base (vehículo, agua sin tronco, arrastre fuera de la grilla, meta fuera de hueco válido) — todo
    igual que el paso a paso ya descrito en la variante `core` (pasos 2 a 5 de ese spec), pero como
-   punto de partida de esta variante. El sistema queda funcional: el juego base es jugable de forma
-   aislada, con la puntuación por avance funcionando.
+   punto de partida de esta variante. Desde este paso, cada vehículo ya nace con su `kind`
+   (auto/camión), `lengthCells` y `color` propios, y la colisión usa esa longitud real — no se deja
+   como un ajuste posterior. El sistema queda funcional: el juego base es jugable de forma aislada,
+   con la puntuación por avance funcionando.
 3. **Agregar el sistema de huecos de meta ocupados y ronda completa** — marcar cada hueco de meta
    como `ocupado` al aterrizar ahí (sumando 50 pts), tratar aterrizar en un hueco ya ocupado como
    muerte, y al ocupar los 5, sumar 1000 pts, limpiar los huecos, reaparecer al sapo, e incrementar
    internamente un contador de ronda. El sistema queda funcional: se puede jugar una ronda completa
    y ver cómo se reinicia, de forma aislada.
 4. **Agregar tortugas que se sumergen** — convertir algunos carriles de río de troncos fijos a
-   grupos de tortugas con ciclo `a flote → parpadeo de aviso → sumergida → a flote`, detectando la
-   muerte del sapo si está sobre una tortuga en el instante en que se sumerge. El sistema queda
-   funcional: los carriles con tortugas son un peligro adicional identificable, de forma aislada.
+   grupos de tortugas con ciclo `a flote → parpadeo de aviso → sumergida → a flote`, animado con
+   opacidad y un ligero hundimiento vertical (no un cambio de color instantáneo), y con un offset de
+   fase propio por carril; detectando la muerte del sapo si está sobre una tortuga en el instante en
+   que se sumerge. El sistema queda funcional: los carriles con tortugas son un peligro adicional
+   identificable, de forma aislada.
 5. **Agregar el temporizador por intento** — barra visual que se encoge en la franja superior del
    canvas, con valor inicial de 30 segundos, deteniéndose mientras el juego está en pausa, y
    tratando su expiración como una muerte más. El sistema queda funcional: el temporizador se ve y
@@ -230,16 +286,27 @@ genérica ya existente.
    React conectado, pausa, fin de juego), y el guardado de puntuación, el detalle del juego y la
    pestaña "FROGGER" del salón de la fama funcionan automáticamente vía la capa de datos ya
    generalizada.
-10. **Verificación manual y build** — jugar una partida completa en `/game/frogger/play`
+10. **Agregar la capa de dibujo detallada** — precalcular en un `<canvas>` offscreen las franjas
+    estáticas (textura de césped, líneas de carril de la carretera, contorno de los huecos de
+    meta), y dibujar por frame el resto del detalle descrito en el Alcance: vetas de madera en los
+    troncos, caparazón segmentado y aletas de las tortugas, ondulación (ripple) del agua, y en cada
+    vehículo su carrocería, ventana, faros y ruedas según su `kind`/`lengthCells`/`color`; el sapo
+    con ojos orientados a la dirección del último salto y su animación de aplastado-estirado; y la
+    silueta distinguible entre huecos de meta libres y ocupados. El sistema queda funcional: el
+    tablero completo se ve detallado y animado, de forma aislada.
+11. **Verificación manual y build** — jugar una partida completa en `/game/frogger/play`
     confirmando: mecánica base (saltos, troncos, colisiones), llenar los 5 huecos de meta y ver la
     ronda completarse (bonus, limpieza de huecos, subida de nivel, aumento de dificultad),
     tortugas sumergiéndose de forma letal, el temporizador agotándose como causa de muerte,
     reaparición con vidas restantes conservando el progreso de la ronda, vida extra al cruzar 5000
     puntos, fin de juego al agotar las 3 vidas, pausa real con botón y con `P`/`Escape`, guardado
     de puntuación real, y que la puntuación aparece en `/game/frogger` y en la pestaña "FROGGER" de
-    `/hall-of-fame` tras recargar. Confirmar que el resto del catálogo no tiene regresiones.
-    Ejecutar `npm run build` sin errores de TypeScript ni de ESLint. El sistema queda funcional y
-    verificado de punta a punta.
+    `/hall-of-fame` tras recargar. Confirmar también el detalle visual (cada elemento del tablero
+    identificable en movimiento, animaciones del sapo/agua/tortugas fluidas, autos y camiones
+    distinguibles entre sí por color y longitud) y que el framerate se mantiene estable durante una
+    partida larga con varias rondas superadas. Confirmar que el resto del catálogo no tiene
+    regresiones. Ejecutar `npm run build` sin errores de TypeScript ni de ESLint. El sistema queda
+    funcional y verificado de punta a punta.
 
 ## Criterios de aceptación
 
@@ -258,7 +325,7 @@ genérica ya existente.
       dificultad de la siguiente ronda aumenta (troncos/vehículos ~15% más rápidos, más carriles
       con tortugas sumergibles, temporizador ~2s más corto con piso de 15s).
 - [ ] Al menos un carril de río usa tortugas con ciclo visible `a flote → parpadeo de aviso →
-    sumergida`; el sapo sobre una tortuga en el instante en que se sumerge muere (resta una
+sumergida`; el sapo sobre una tortuga en el instante en que se sumerge muere (resta una
       vida).
 - [ ] Una barra de temporizador visible en la franja superior del canvas se encoge durante cada
       intento y no avanza mientras el juego está en pausa; agotarla resta una vida.
@@ -278,7 +345,7 @@ genérica ya existente.
       engine (`destroy()` se llama en el cleanup del `useEffect`, sin loops ni listeners de teclado
       colgando).
 - [ ] `app/game-engines/registry.ts` incluye la entrada `frogger: { createGame, width: 560, height:
-    520 }`, sin modificar `app/game/[id]/play/page.tsx` ni `GamePlayClient.tsx`.
+520 }`, sin modificar `app/game/[id]/play/page.tsx` ni `GamePlayClient.tsx`.
 - [ ] En `/game/frogger/play`, guardar la puntuación inserta una fila real en `scores`
       (`game_id: "frogger"`) vía `saveScore`, reutilizando la Server Action ya existente sin
       cambios.
@@ -288,6 +355,23 @@ genérica ya existente.
       `game_id: "frogger"`.
 - [ ] El resto del catálogo (`asteroids`, `tetris`, `arkanoid`, `snake`) conserva exactamente su
       comportamiento actual, sin regresiones.
+- [ ] Ningún elemento del tablero (sapo, troncos, tortugas, vehículos, césped, agua, carretera,
+      huecos de meta) se dibuja como una única forma geométrica plana de un solo color; cada uno
+      combina varias primitivas para sugerir textura o identidad, según lo descrito en el Alcance.
+- [ ] Los vehículos de las 5 filas de carretera incluyen autos (~1 celda) y camiones (~2 celdas),
+      cada uno con carrocería, ventana, faros y ruedas distinguibles, y con un color propio que se
+      distingue del de otros vehículos dentro del mismo carril.
+- [ ] La caja de colisión de cada vehículo corresponde a su longitud real dibujada (`lengthCells`):
+      un camión bloquea/mata en más celdas que un auto.
+- [ ] El sapo muestra ojos orientados según la dirección del último salto, y anima un
+      aplastado-estirado simple durante cada salto entre celdas.
+- [ ] El agua anima una ondulación (ripple) en bucle, la carretera muestra líneas discontinuas de
+      carril, y el césped muestra una textura sutil distinguible de una franja sólida.
+- [ ] Las tortugas animan su transición `a flote → parpadeo de aviso → sumergida` con un cambio de
+      opacidad perceptible y un ligero hundimiento vertical, no un cambio de color instantáneo, y
+      con un desfase de ciclo distinto entre carriles.
+- [ ] Los huecos de meta libres y ocupados son visualmente distinguibles entre sí (contorno vacío
+      vs. silueta de sapo pequeño).
 - [ ] `npm run build` compila sin errores de TypeScript ni de ESLint.
 
 ## Decisiones tomadas y descartadas
@@ -329,8 +413,22 @@ genérica ya existente.
   eje de profundidad de esta variante enfocado en un solo sistema coherente (rondas/vidas/
   temporizador/tortugas) en vez de sumar mecánicas adicionales no directamente relacionadas, que
   inflarían el alcance sin aportar a la variante que la distingue de `core`.
-- **Sin assets gráficos externos**, mismo criterio que la variante `core`: todo se dibuja con
-  primitivas de canvas y la paleta de colores ya existente.
+- **Gráficos procedurales detallados, en vez de formas planas de color sólido**, a pedido explícito:
+  cada elemento (sapo, troncos, tortugas, vehículos, franjas) se compone de varias primitivas de
+  canvas para sugerir textura/identidad — vetas de madera, caparazón segmentado, ondulación del
+  agua, líneas de carril — porque en Frogger todo está en movimiento y cada elemento necesita
+  leerse de un vistazo. Se descartó usar sprites, imágenes o generar un spritesheet: sigue sin haber
+  assets gráficos externos, solo composición procedural en tiempo de dibujo. **A diferencia de la
+  variante `core`, este ya no es "el mismo criterio gráfico"**: el nivel de detalle y las
+  animaciones son una diferencia deliberada entre variantes, no algo compartido.
+- **Animaciones limitadas a las económicas de calcular** (aplastado-estirado del sapo, ripple del
+  agua, parpadeo/hundimiento de las tortugas), descartando sistemas de partículas, explosiones o
+  transiciones elaboradas, para reforzar la lectura del estado del juego sin construir un sistema de
+  animación complejo.
+- **Paleta ampliada solo para los vehículos**, en vez de limitarlos a los 4 neones de
+  `globals.css`, para que autos y camiones se distingan entre sí dentro de un mismo carril; el resto
+  del tablero (sapo, troncos, tortugas, franjas) se mantiene dentro de la paleta neón existente para
+  no perder la identidad visual de la plataforma.
 - **Reutilización de `cover-rana` y `color: "green"`**, mismo criterio que la variante `core` — la
   fila semilla de `games` es idéntica entre ambas variantes.
 - **Canvas 560×520 con grilla 14×13 (celdas de 40px)**, idéntico al de la variante `core` — mismo
@@ -378,3 +476,19 @@ genérica ya existente.
   terminó). Mitigación: una vez que `onGameOver` se invoca, el engine no debe volver a invocar
   `onLivesChange` bajo ninguna circunstancia (misma bandera `gameOverFired` que evita el doble
   `onGameOver`).
+- **Costo de dibujo por frame por el mayor detalle visual**: redibujar vetas, caparazones, ripple y
+  detalle de vehículos con varias primitivas por elemento, en vez de un rectángulo por elemento,
+  aumenta el trabajo del loop de canvas; con muchos troncos/vehículos/tortugas en pantalla a la vez
+  (agravado en rondas avanzadas por la mayor velocidad) podría degradar el framerate. Mitigación:
+  precalcular las franjas estáticas (césped, líneas de carril, contorno de huecos de meta) en el
+  `<canvas>` offscreen descrito en el Modelo de datos, en vez de recalcularlas cada frame, y
+  mantener el detalle por elemento móvil en primitivas simples sin sombras/blur costosos.
+- **Caja de colisión de vehículos desalineada de su dibujo**: si la colisión de un camión usara un
+  ancho fijo mientras su dibujo usa `lengthCells`, el jugador sufriría muertes "fantasma" (choca sin
+  tocar visualmente el vehículo, o sobrevive tocándolo). Mitigación: derivar la caja de colisión
+  siempre de `lengthCells`, la misma propiedad que determina el ancho dibujado — nunca un valor de
+  colisión independiente.
+- **Contraste insuficiente de la paleta ampliada de vehículos** sobre el fondo oscuro de la
+  carretera: un color de vehículo mal elegido podría ser poco legible contra el asfalto o mezclarse
+  con otro vehículo del mismo carril. Mitigación: dar a cada vehículo un contorno oscuro y verificar
+  legibilidad durante el paso de verificación manual.
