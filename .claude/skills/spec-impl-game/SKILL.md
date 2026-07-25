@@ -1,11 +1,12 @@
 ---
 name: spec-impl-game
 description: >-
-  Implementa un spec de integración de juego aprobado siguiendo /spec-impl al pie de la letra
-  (valida estado Aprobado, crea la rama spec-NN-slug, implementa paso a paso con pausas) y, al
-  terminar, dispara automáticamente y en secuencia dos agentes sobre el juego recién implementado:
-  primero skin-designer (selector de skins) y luego mobile-porter (controles táctiles), nunca en
-  paralelo.
+  Implementa un spec de integración de juego aprobado siguiendo /spec-impl (valida estado
+  Aprobado, crea la rama spec-NN-slug), pero implementa el plan de corrido —anunciando cada paso
+  antes de empezarlo, sin pausas intermedias— y difiere toda validación manual en navegador (MCP
+  de Playwright) al cierre. Al terminar, dispara automáticamente y en secuencia dos agentes sobre
+  el juego recién implementado: primero skin-designer (selector de skins) y luego mobile-porter
+  (controles táctiles), nunca en paralelo.
 disable-model-invocation: true
 argument-hint: <NN-spec-name>
 allowed-tools: Bash(git status:*), Bash(git branch:*), Bash(git checkout:*), Bash(cat:*), Bash(ls:*), Task, Agent
@@ -32,19 +33,28 @@ Config de creación de rama:
 ## Relación con `/spec-impl`
 
 Esta skill **es una especialización de `/spec-impl`** (`.claude/skills/spec-impl/SKILL.md`), no un
-reemplazo. Reutiliza exactamente su metodología —identificación del spec, validación del estado
-Aprobado, creación/cambio de rama, resumen del spec, implementación paso a paso con pausas— y le
-añade una única fase final: al terminar la implementación, dispara automáticamente los agentes
-`skin-designer` y `mobile-porter`, uno después del otro, sobre el juego recién integrado.
+reemplazo. Reutiliza su metodología —identificación del spec, validación del estado Aprobado,
+creación/cambio de rama, resumen del spec, implementación guiada por el plan— y le añade una única
+fase final: al terminar la implementación, dispara automáticamente los agentes `skin-designer` y
+`mobile-porter`, uno después del otro, sobre el juego recién integrado.
+
+Hay **dos desviaciones deliberadas** respecto a `/spec-impl`, pensadas para agilizar la integración
+de un juego completo (planes de 6-10 pasos):
+
+1. **Ritmo de implementación:** sin pausas entre pasos del plan. Se anuncia cada paso antes de
+   empezarlo y se continúa de inmediato al terminarlo, en vez de esperar confirmación tras cada uno.
+2. **Validación en navegador diferida:** ninguna verificación manual con el MCP de Playwright se
+   ejecuta durante la implementación, aunque un paso del plan la mencione. Se ofrece una sola vez,
+   al cierre, junto con la revisión de criterios de aceptación.
+
+Fuera de esas dos desviaciones, **manda `/spec-impl` sin cambios**: sus cuatro fases, su tono, y
+todas sus reglas duras (incluidas las excepciones que sí detienen la ejecución: ambigüedad genuina y
+pedidos fuera de alcance). Antes de continuar, **lee `.claude/skills/spec-impl/SKILL.md` completo**.
 
 Está pensada específicamente para specs de **integración de juego**: los que produce `/add-game`
 (motor real en `<canvas>` + leaderboard en Supabase), que siempre declaran un `id` de catálogo
 (p. ej. `id: "snake"`) en su sección de Alcance o Modelo de datos. No la uses para specs genéricos
 sin un juego asociado — para esos, usa `/spec-impl` directamente.
-
-Antes de continuar, **lee `.claude/skills/spec-impl/SKILL.md` completo** y aplica sus cuatro fases,
-su tono, y todas sus reglas duras exactamente igual que si el usuario hubiera invocado `/spec-impl`.
-Donde este documento no diga lo contrario, el comportamiento de `/spec-impl` aplica sin cambios.
 
 ---
 
@@ -58,9 +68,22 @@ Sigue las **Fases 1 a 4 de `.claude/skills/spec-impl/SKILL.md`** tal cual están
    ningún agente.
 3. **Fase 3** — Crear/cambiar a la rama `spec-NN-slug` según `AutoCreateBranch`, y mostrar el
    resumen del spec (objetivo, alcance, plan, criterios de aceptación).
-4. **Fase 4** — Implementar el plan paso a paso, pausando tras cada paso para que el usuario revise
-   el diff, exactamente con las mismas reglas (no improvisar fuera del spec, detenerse ante
-   ambigüedades con opciones concretas, rechazar pedidos fuera de alcance).
+4. **Fase 4, con el ritmo modificado de esta skill** — pide la misma confirmación inicial única que
+   `/spec-impl` (`¿Empezamos con el Paso 1?`), pero aclarando en ese mensaje que, a partir del OK,
+   todos los pasos del plan se implementarán **de corrido, sin pausas intermedias**. Una vez
+   confirmado:
+   - Antes de cada paso, anuncia con una línea uniforme qué paso estás por comenzar:
+     `▶ Paso N de M — <título del paso según el plan del spec>`.
+   - Implementa el paso, muestra un resumen breve de qué archivos tocaste y qué hiciste, y
+     **continúa de inmediato** con el siguiente paso — no preguntes "¿continúo con el Paso N+1?".
+   - **No ejecutes validaciones manuales en navegador** (MCP de Playwright, capturas, partidas de
+     prueba) durante esta fase, aunque un paso del plan las mencione explícitamente — quedan
+     diferidas a la Fase D de esta skill. Sí siguen aplicando las verificaciones no interactivas de
+     siempre si el spec las pide (`npm run build`, `lint`, lectura de código).
+   - Se mantienen las dos excepciones que sí detienen la ejecución, igual que en `/spec-impl`: ante
+     una **ambigüedad genuina** que el spec no resuelve, detente, descríbela y presenta 2-3 opciones
+     concretas esperando la decisión del usuario; ante un **pedido fuera de alcance**, recházalo y
+     sugiere anotarlo para otro spec. Correr de corrido no significa improvisar.
 
 **No avances a la Fase B de esta skill hasta que todos los pasos del plan del spec estén
 implementados** — el punto en el que `/spec-impl` mostraría su mensaje "✅ Todos los pasos del plan
@@ -106,6 +129,10 @@ otro**:
    (`controles-tactiles-moviles`). Espera a que termine y muestra un resumen de su reporte (qué
    faltaba, qué implementó, cualquier bloqueante).
 
+Si alguno de los dos agentes sugiere en su reporte una verificación manual en navegador (por
+ejemplo, `skin-designer` suele sugerir `npm run dev` + MCP de Playwright), **no la ejecutes en esta
+fase**: anótala como pendiente y se ofrece junto con el resto de la validación en la Fase D.
+
 **Regla dura explícita:** los dos agentes se ejecutan **uno después del otro, nunca en paralelo** —
 no emitas ambas llamadas de Agent en el mismo turno/bloque. `skin-designer` siempre va primero;
 `mobile-porter` siempre después, y solo arranca una vez que `skin-designer` reportó su resultado.
@@ -115,9 +142,23 @@ touchControls) — eso es exactamente lo que delegas en ellos.
 
 ---
 
-## Fase D — Cierre
+## Fase D — Cierre y oferta de validación con Playwright
 
-Cierra igual que recomienda `/spec-impl`, ahora incluyendo también el trabajo de ambos agentes:
+Entrega primero un reporte final consolidado con tres bloques: (1) qué implementó el spec paso a
+paso, (2) el resumen de `skin-designer`, (3) el resumen de `mobile-porter`.
+
+Después, **pregunta una sola vez** si se quiere ejecutar la validación en navegador con el MCP de
+Playwright junto con la verificación de los criterios de aceptación. Deja explícito el alcance:
+
+- **Sí incluye:** levantar `npm run dev`, abrir `/game/<id>/play` y revisar visualmente el HUD, el
+  selector de skins y los controles táctiles; medir el frame rate y observar el comportamiento de
+  rendimiento del motor. Las capturas que se generen van a `.playwright-screenshots/` (convención
+  del proyecto).
+- **No incluye:** jugar partidas completas ni intentar terminar o ganar el juego — solo lo mínimo
+  necesario para que el motor esté corriendo y se pueda observar el render y el frame rate.
+
+Si el usuario acepta, ejecuta esa validación acotada y reporta los hallazgos (visuales, de frame
+rate/rendimiento) antes de cerrar. Si el usuario declina (o no responde de inmediato), cierra con:
 
 ```
 ✅ Spec implementado, con selector de skins y controles táctiles aplicados.
@@ -128,16 +169,18 @@ spec los menciona, los de soporte táctil/skins). Si todos pasan, actualiza el e
 esta rama.
 ```
 
-Entrega un reporte final consolidado con tres bloques: (1) qué implementó el spec paso a paso,
-(2) el resumen de `skin-designer`, (3) el resumen de `mobile-porter`.
-
 ---
 
 ## Reglas duras
 
-- **Hereda todas las reglas duras de `/spec-impl`** (bloqueo si el estado no es Aprobado, no
-  improvisar fuera del spec, pausar tras cada paso de implementación, no ofrecer alternativas al
-  mensaje de bloqueo).
+- **Hereda las reglas duras de `/spec-impl`** (bloqueo si el estado no es Aprobado, no improvisar
+  fuera del spec, detenerse ante ambigüedad genuina o pedidos fuera de alcance, no ofrecer
+  alternativas al mensaje de bloqueo), **excepto el ritmo de la Fase 4**: en vez de pausar tras cada
+  paso, aquí se anuncia (`▶ Paso N de M`) y se continúa de inmediato sin pedir confirmación
+  intermedia.
+- **No se ejecutan validaciones manuales en navegador (MCP de Playwright) durante las Fases A, B ni
+  C**, aunque el plan del spec o el reporte de un agente las mencione — se ofrecen una única vez en
+  la Fase D, acotadas a revisión visual y frame rate/rendimiento, nunca a jugar partidas completas.
 - **Los agentes se disparan en secuencia estricta:** `skin-designer` → `mobile-porter`, jamás en
   paralelo, y `mobile-porter` nunca arranca antes de que `skin-designer` haya terminado.
 - **El `id` del juego se extrae del spec sin preguntar**, salvo ambigüedad genuina e irresoluble
@@ -157,13 +200,16 @@ Entrega un reporte final consolidado con tres bloques: (1) qué implementó el s
 ```
 /spec-impl-game 09-snake-motor-leaderboard
 
-  Fase A  →  Ejecuta /spec-impl 09-snake-motor-leaderboard completo:
+  Fase A  →  Ejecuta /spec-impl 09-snake-motor-leaderboard con el ritmo de esta skill:
              valida estado Aprobado, crea/usa la rama spec-09-snake-motor-leaderboard,
-             implementa el plan paso a paso con pausas.
+             pide un único OK inicial y luego implementa el plan de corrido, anunciando
+             "▶ Paso N de M" antes de cada paso, sin pausas ni Playwright intermedio.
   Fase B  →  Extrae id: "snake" del spec.
-  Fase C  →  Lanza skin-designer(snake) → espera → lanza mobile-porter(snake) → espera.
-  Fase D  →  Reporte consolidado + recordatorio de verificar criterios de aceptación
-             y marcar el spec como Implementado.
+  Fase C  →  Lanza skin-designer(snake) → espera → lanza mobile-porter(snake) → espera
+             (sin ejecutar las validaciones de navegador que sugieran).
+  Fase D  →  Reporte consolidado + oferta única de validar con Playwright (visual y
+             frame rate, sin partidas completas) + recordatorio de verificar criterios
+             de aceptación y marcar el spec como Implementado.
 
 /spec-impl-game 02-powerups  (estado: Borrador)
 
