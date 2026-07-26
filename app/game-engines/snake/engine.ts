@@ -122,6 +122,27 @@ const MIN_TICK_MS = 60;
 const FRUITS_PER_LEVEL = 5;
 const TICK_SPEEDUP_FACTOR = 0.9;
 
+// El fondo+grid, el borde con glow, el cuerpo de cada segmento y la cabeza
+// (contorno + ojos) tienen geometría fija: solo cambian de posición/color
+// por skin, nunca de forma frame a frame. Se cachean en canvas offscreen
+// construidos una sola vez (y reconstruidos en `setSkin`) en vez de
+// retrazarse/recalcular `shadowBlur` cada frame — mismo tratamiento aplicado
+// a Frogger (spec 11).
+//
+// Margen de sangrado reservado en los sprites que hornean el `shadowBlur`:
+// cubre con holgura el desenfoque visible incluso en el glowBlur más alto
+// del catálogo de este motor (14, `neon`), igual que `GLOW_MARGIN` en
+// frogger/engine.ts.
+const GLOW_MARGIN = 28;
+const BODY_SPRITE_SIZE = Math.ceil(CELL_SIZE - 2 + GLOW_MARGIN * 2);
+const HEAD_SPRITE_SIZE = BODY_SPRITE_SIZE;
+
+// La cabeza solo tiene 4 orientaciones posibles (arriba/abajo/izquierda/
+// derecha): se cachean las 4 variantes completas (relleno + contorno + ojos)
+// en vez de recalcular la posición de los ojos cada frame.
+type SnakeDirKey = 'up' | 'down' | 'left' | 'right';
+const SNAKE_DIR_KEYS: SnakeDirKey[] = ['up', 'down', 'left', 'right'];
+
 interface GridPoint {
   x: number;
   y: number;
@@ -144,6 +165,40 @@ export function createGame(
 
   let currentSkin: SkinName = options?.skin ?? 'classic';
   let palette = SKIN_PALETTES[currentSkin];
+
+  // Fondo + grid: geometría 100% fija, se pinta una vez y se blitea con
+  // `drawImage` en vez de retrazar 19x2 líneas por frame (ver `buildStaticLayer`).
+  const staticLayer = document.createElement('canvas');
+  staticLayer.width = CANVAS_SIZE;
+  staticLayer.height = CANVAS_SIZE;
+  const staticCtx = staticLayer.getContext('2d')!;
+
+  // Borde con glow: se dibuja al final (encima de la serpiente, igual que
+  // antes) pero desde un canvas transparente cacheado, con el `shadowBlur`
+  // horneado una sola vez en vez de asignarlo/resetearlo cada frame.
+  const wallLayer = document.createElement('canvas');
+  wallLayer.width = CANVAS_SIZE;
+  wallLayer.height = CANVAS_SIZE;
+  const wallCtx = wallLayer.getContext('2d')!;
+
+  // Sprite único del cuerpo (mismo cuadrado para todos los segmentos, solo
+  // cambia la posición): el glow ya viene horneado (ver `buildBodySprite`).
+  const bodySprite = document.createElement('canvas');
+  bodySprite.width = BODY_SPRITE_SIZE;
+  bodySprite.height = BODY_SPRITE_SIZE;
+  const bodyCtx = bodySprite.getContext('2d')!;
+
+  // 4 variantes de cabeza (una por dirección), con relleno+glow, contorno y
+  // ojos ya compuestos (ver `buildHeadSprites`).
+  const headSprites = {} as Record<SnakeDirKey, HTMLCanvasElement>;
+  const headSpriteCtxs = {} as Record<SnakeDirKey, CanvasRenderingContext2D>;
+  for (const key of SNAKE_DIR_KEYS) {
+    const sprite = document.createElement('canvas');
+    sprite.width = HEAD_SPRITE_SIZE;
+    sprite.height = HEAD_SPRITE_SIZE;
+    headSprites[key] = sprite;
+    headSpriteCtxs[key] = sprite.getContext('2d')!;
+  }
 
   let snake: GridPoint[] = [];
   let direction: GridPoint = { x: 1, y: 0 };
@@ -277,92 +332,158 @@ export function createGame(
     }
   }
 
-  function drawWalls() {
-    ctx.strokeStyle = palette.wall;
-    ctx.lineWidth = WALL_THICKNESS;
-    if (palette.glow) {
-      ctx.shadowColor = palette.wall;
-      ctx.shadowBlur = palette.glowBlur;
+  // Construye una sola vez (y en cada `setSkin`) el fondo + grid en un canvas
+  // offscreen: geometría 100% fija, antes se retrazaban 19x2 líneas por
+  // frame sin necesidad (spec 11, mismo tratamiento que `drawStaticLayer` de
+  // Frogger).
+  function buildStaticLayer() {
+    staticCtx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+    staticCtx.fillStyle = palette.bg;
+    staticCtx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+    staticCtx.strokeStyle = palette.grid;
+    staticCtx.lineWidth = 1;
+    for (let i = 1; i < GRID_SIZE; i++) {
+      staticCtx.beginPath();
+      staticCtx.moveTo(i * CELL_SIZE, 0);
+      staticCtx.lineTo(i * CELL_SIZE, CANVAS_SIZE);
+      staticCtx.stroke();
+      staticCtx.beginPath();
+      staticCtx.moveTo(0, i * CELL_SIZE);
+      staticCtx.lineTo(CANVAS_SIZE, i * CELL_SIZE);
+      staticCtx.stroke();
     }
-    ctx.strokeRect(
+  }
+
+  // El borde nunca cambia de forma ni de posición: el `shadowBlur` se
+  // hornea una sola vez aquí (antes se asignaba/reseteaba cada frame para
+  // una figura estática).
+  function buildWallLayer() {
+    wallCtx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+    wallCtx.strokeStyle = palette.wall;
+    wallCtx.lineWidth = WALL_THICKNESS;
+    if (palette.glow) {
+      wallCtx.shadowColor = palette.wall;
+      wallCtx.shadowBlur = palette.glowBlur;
+    }
+    wallCtx.strokeRect(
       WALL_INSET,
       WALL_INSET,
       CANVAS_SIZE - WALL_INSET * 2,
       CANVAS_SIZE - WALL_INSET * 2,
     );
-    if (palette.glow) ctx.shadowBlur = 0;
+    if (palette.glow) wallCtx.shadowBlur = 0;
   }
 
-  function drawGrid() {
-    ctx.strokeStyle = palette.grid;
-    ctx.lineWidth = 1;
-    for (let i = 1; i < GRID_SIZE; i++) {
-      ctx.beginPath();
-      ctx.moveTo(i * CELL_SIZE, 0);
-      ctx.lineTo(i * CELL_SIZE, CANVAS_SIZE);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(0, i * CELL_SIZE);
-      ctx.lineTo(CANVAS_SIZE, i * CELL_SIZE);
-      ctx.stroke();
+  // Sprite único del cuerpo: mismo cuadrado para cualquier segmento, con el
+  // glow horneado una sola vez (antes: `shadowBlur` asignado/reseteado
+  // dentro del bucle por segmento en `drawSnake`, igual que el antipatrón ya
+  // corregido en `drawTurtleGroup` de Frogger).
+  function buildBodySprite() {
+    bodyCtx.clearRect(0, 0, BODY_SPRITE_SIZE, BODY_SPRITE_SIZE);
+    bodyCtx.fillStyle = palette.bodyFill;
+    if (palette.glow) {
+      bodyCtx.shadowColor = palette.bodyFill;
+      bodyCtx.shadowBlur = palette.glowBlur * 0.6;
     }
+    bodyCtx.fillRect(
+      GLOW_MARGIN + 1,
+      GLOW_MARGIN + 1,
+      CELL_SIZE - 2,
+      CELL_SIZE - 2,
+    );
+    if (palette.glow) bodyCtx.shadowBlur = 0;
   }
 
-  function drawEyes(head: GridPoint) {
-    const cx = head.x * CELL_SIZE + CELL_SIZE / 2;
-    const cy = head.y * CELL_SIZE + CELL_SIZE / 2;
+  function dirKey(d: GridPoint): SnakeDirKey {
+    if (d.x === 1) return 'right';
+    if (d.x === -1) return 'left';
+    if (d.y === -1) return 'up';
+    return 'down';
+  }
+
+  function eyeOffsetsFor(
+    key: SnakeDirKey,
+    cx: number,
+    cy: number,
+  ): { e1: GridPoint; e2: GridPoint } {
     const offset = 7;
-    const radius = 3;
-    let e1: GridPoint;
-    let e2: GridPoint;
-    if (direction.x === 1) {
-      e1 = { x: cx + offset, y: cy - offset };
-      e2 = { x: cx + offset, y: cy + offset };
-    } else if (direction.x === -1) {
-      e1 = { x: cx - offset, y: cy - offset };
-      e2 = { x: cx - offset, y: cy + offset };
-    } else if (direction.y === -1) {
-      e1 = { x: cx - offset, y: cy - offset };
-      e2 = { x: cx + offset, y: cy - offset };
-    } else {
-      e1 = { x: cx - offset, y: cy + offset };
-      e2 = { x: cx + offset, y: cy + offset };
+    if (key === 'right') {
+      return {
+        e1: { x: cx + offset, y: cy - offset },
+        e2: { x: cx + offset, y: cy + offset },
+      };
     }
-    ctx.fillStyle = palette.eyeFill;
-    for (const eye of [e1, e2]) {
-      ctx.beginPath();
-      ctx.arc(eye.x, eye.y, radius, 0, Math.PI * 2);
-      ctx.fill();
+    if (key === 'left') {
+      return {
+        e1: { x: cx - offset, y: cy - offset },
+        e2: { x: cx - offset, y: cy + offset },
+      };
+    }
+    if (key === 'up') {
+      return {
+        e1: { x: cx - offset, y: cy - offset },
+        e2: { x: cx + offset, y: cy - offset },
+      };
+    }
+    return {
+      e1: { x: cx - offset, y: cy + offset },
+      e2: { x: cx + offset, y: cy + offset },
+    };
+  }
+
+  // Las 4 orientaciones de la cabeza (relleno+glow, contorno y ojos) se
+  // cachean completas: antes `drawEyes` recalculaba la posición de los ojos
+  // cada frame y `drawSnake` asignaba `shadowBlur` en vivo para el relleno.
+  function buildHeadSprites() {
+    for (const key of SNAKE_DIR_KEYS) {
+      const hctx = headSpriteCtxs[key];
+      hctx.clearRect(0, 0, HEAD_SPRITE_SIZE, HEAD_SPRITE_SIZE);
+      hctx.fillStyle = palette.headFill;
+      if (palette.glow) {
+        hctx.shadowColor = palette.headFill;
+        hctx.shadowBlur = palette.glowBlur;
+      }
+      hctx.fillRect(
+        GLOW_MARGIN + 1,
+        GLOW_MARGIN + 1,
+        CELL_SIZE - 2,
+        CELL_SIZE - 2,
+      );
+      if (palette.glow) hctx.shadowBlur = 0;
+
+      hctx.strokeStyle = palette.headStroke;
+      hctx.lineWidth = 2;
+      hctx.strokeRect(
+        GLOW_MARGIN + 2,
+        GLOW_MARGIN + 2,
+        CELL_SIZE - 4,
+        CELL_SIZE - 4,
+      );
+
+      const cx = GLOW_MARGIN + CELL_SIZE / 2;
+      const cy = GLOW_MARGIN + CELL_SIZE / 2;
+      const { e1, e2 } = eyeOffsetsFor(key, cx, cy);
+      hctx.fillStyle = palette.eyeFill;
+      for (const eye of [e1, e2]) {
+        hctx.beginPath();
+        hctx.arc(eye.x, eye.y, 3, 0, Math.PI * 2);
+        hctx.fill();
+      }
     }
   }
 
   function drawSnake() {
     snake.forEach((segment, i) => {
       const isHead = i === 0;
-      const fill = isHead ? palette.headFill : palette.bodyFill;
-      ctx.fillStyle = fill;
-      if (palette.glow) {
-        ctx.shadowColor = fill;
-        ctx.shadowBlur = palette.glowBlur * (isHead ? 1 : 0.6);
-      }
-      ctx.fillRect(
-        segment.x * CELL_SIZE + 1,
-        segment.y * CELL_SIZE + 1,
-        CELL_SIZE - 2,
-        CELL_SIZE - 2,
+      // Sprites offscreen cacheados (`buildBodySprite`/`buildHeadSprites`):
+      // el glow ya viene horneado, sin `shadowBlur` en vivo por segmento y
+      // por frame (spec 11, mismo tratamiento que `drawTurtleGroup`).
+      const sprite = isHead ? headSprites[dirKey(direction)] : bodySprite;
+      ctx.drawImage(
+        sprite,
+        segment.x * CELL_SIZE - GLOW_MARGIN,
+        segment.y * CELL_SIZE - GLOW_MARGIN,
       );
-      if (palette.glow) ctx.shadowBlur = 0;
-      if (isHead) {
-        ctx.strokeStyle = palette.headStroke;
-        ctx.lineWidth = 2;
-        ctx.strokeRect(
-          segment.x * CELL_SIZE + 2,
-          segment.y * CELL_SIZE + 2,
-          CELL_SIZE - 4,
-          CELL_SIZE - 4,
-        );
-        drawEyes(segment);
-      }
     });
   }
 
@@ -385,12 +506,14 @@ export function createGame(
   }
 
   function draw() {
-    ctx.fillStyle = palette.bg;
-    ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
-    drawGrid();
+    // Fondo+grid cacheados (`buildStaticLayer`): un solo `drawImage` en vez
+    // de un `fillRect` + 38 `stroke()` de grid cada frame.
+    ctx.drawImage(staticLayer, 0, 0);
     drawFruit();
     drawSnake();
-    drawWalls();
+    // El borde se dibuja al final (encima de la serpiente, mismo orden que
+    // antes) desde el sprite cacheado con el glow ya horneado.
+    ctx.drawImage(wallLayer, 0, 0);
   }
 
   function loop(timestamp: number) {
@@ -458,6 +581,10 @@ export function createGame(
 
   initSnake();
   spawnFruit();
+  buildStaticLayer();
+  buildWallLayer();
+  buildBodySprite();
+  buildHeadSprites();
   callbacks.onLivesChange(1);
   callbacks.onLevelChange(level);
   callbacks.onScoreChange(score);
@@ -480,6 +607,14 @@ export function createGame(
     setSkin(skin: SkinName) {
       currentSkin = skin;
       palette = SKIN_PALETTES[skin];
+      // El fondo/grid, el borde y los sprites de cuerpo/cabeza viven en
+      // canvas offscreen cacheados: hay que regenerarlos todos con la nueva
+      // paleta antes de repintar el frame actual (mismo contrato que
+      // `setSkin` en frogger/engine.ts).
+      buildStaticLayer();
+      buildWallLayer();
+      buildBodySprite();
+      buildHeadSprites();
       draw();
     },
   };

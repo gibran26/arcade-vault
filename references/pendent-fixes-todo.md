@@ -139,6 +139,31 @@ build`) no ejecuta ESLint — solo compila TypeScript (verificado corriendo el b
   de la regla sin cambiar el comportamiento observable.
 - **Estado:** abierto.
 
+### `.claude/agents/skin-designer.md`: la guía del agente describe `score`/`lives`/`level` como `useState`, pero ya migraron a `useRef`
+
+- **Detectado en:** diseño del subagente `game-performance-booster`, al auditar el estado de
+  `GamePlayClient.tsx` tras el spec `11-optimizacion-rendimiento-frogger`, 25/07/2026.
+- **Archivo:** `.claude/agents/skin-designer.md`, Fase 1 (punto 3) y Fase 3 (punto 4).
+- **Síntoma:** la guía del agente describe el HUD como si `score`/`lives`/`level` siguieran en
+  `useState`. Desde el spec `11` esos tres valores viven en `useRef` (`scoreRef`/`livesRef`/
+  `levelRef`) con actualización directa del DOM vía refs de nodo (`scoreElRef`/`livesElRef`/
+  `levelElRef`), y los nodos del JSX declaran un valor inicial fijo a propósito. Un
+  `skin-designer` que siga su guía al pie de la letra puede reintroducir `useState` para esos
+  valores o devolver el valor cambiante al JSX, deshaciendo la optimización.
+- **Divergencia menor adicional:** la guía describe el 3er parámetro de `createGame` como
+  `options?: { skin?: SkinName }` inline, pero `registry.ts` ya lo tiene extraído como la interfaz
+  `EngineOptions`.
+- **Ojo al corregir:** la sugerencia de fix de la entrada anterior de este to-do
+  (`setSkinState` dentro de un efecto) propone un inicializador perezoso
+  `useState<SkinName>(() => loadSkin(game.id))`, que es exactamente el patrón que `skin-designer.md`
+  prohíbe en sus Reglas duras por el mismatch de hidratación SSR/cliente. Las dos entradas hay que
+  resolverlas juntas, no por separado.
+- **Por qué queda fuera de esta tarea:** el encargo era crear el subagente `game-performance-booster`;
+  reescribir la guía de otro agente es alcance distinto.
+- **Sugerencia de fix (no aplicada):** actualizar en `skin-designer.md` la descripción del HUD para
+  reflejar el patrón de refs vigente, y sustituir la firma inline de `options` por `EngineOptions`.
+- **Estado:** abierto.
+
 ## ✅ Resueltos
 
 ### Frogger: framerate por debajo del resto del catálogo, más marcado en las skins con glow

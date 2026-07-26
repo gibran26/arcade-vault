@@ -29,6 +29,15 @@ const PANEL_X = W; // 300
 const PANEL_W = 180; // W total del canvas = 480
 const CANVAS_W = PANEL_X + PANEL_W; // 480
 const CANVAS_H = H; // 600
+const NB = 24; // tamaño de celda del panel "NEXT"
+
+// Margen de sangrado reservado en los sprites que hornean el `shadowBlur`
+// (mismo criterio que `frogger/engine.ts`, spec 11: cubre con holgura el
+// desenfoque visible incluso en el `glowBlur` más alto del catálogo, 14 en
+// `neon`), para que el blur no quede recortado en el borde del sprite.
+const GLOW_MARGIN = 28;
+const BLOCK_SPRITE_SIZE = BLOCK + GLOW_MARGIN * 2;
+const NB_SPRITE_SIZE = NB + GLOW_MARGIN * 2;
 
 interface TetrisPalette {
   pieces: (string | null)[];
@@ -76,13 +85,13 @@ const SKIN_PALETTES: Record<SkinName, TetrisPalette> = {
     pieces: [
       null,
       '#00f5ff', // I - cian
-      '#ff00ff', // O - magenta
-      '#00ffff', // T - cian brillante
-      '#ff2fd0', // S - rosa magenta
-      '#7cf9ff', // Z - cian pálido
-      '#ff66ff', // J - magenta claro
-      '#00d9ff', // L - cian variante
-      '#e000ff', // N - púrpura magenta (tuerca)
+      '#ffee00', // O - amarillo neón
+      '#ff00ff', // T - magenta
+      '#39ff14', // S - verde neón
+      '#ff2050', // Z - rojo neón
+      '#2979ff', // J - azul eléctrico
+      '#ff8800', // L - naranja neón
+      '#b000ff', // N - violeta (tuerca)
     ],
     boardBg: '#0a0014',
     gridLine: 'rgba(0,245,255,0.16)',
@@ -186,6 +195,44 @@ export function createGame(
   canvas.height = CANVAS_H;
   const ctx = canvas.getContext('2d')!;
   let palette = SKIN_PALETTES[options?.skin ?? 'classic'];
+
+  // Capa estática del tablero (fondo + rejilla, spec 11): nunca cambian entre
+  // frames, solo dependen de la skin — se hornean una vez y se blitean.
+  const boardStaticLayer = document.createElement('canvas');
+  boardStaticLayer.width = W;
+  boardStaticLayer.height = H;
+  const boardStaticCtx = boardStaticLayer.getContext('2d')!;
+
+  // Capa estática del panel lateral (fondo + overlay + borde + etiquetas
+  // fijas SCORE/LINES/LEVEL/NEXT, spec 11): solo los valores numéricos y el
+  // preview de la siguiente pieza cambian por frame.
+  const panelStaticLayer = document.createElement('canvas');
+  panelStaticLayer.width = PANEL_W;
+  panelStaticLayer.height = CANVAS_H;
+  const panelStaticCtx = panelStaticLayer.getContext('2d')!;
+
+  // Variantes discretas: solo hay 8 tipos de pieza (colorIndex 1-8), así que
+  // alcanza con cachear un sprite por color (a las 2 escalas usadas, tablero
+  // y preview) en vez de recalcular `fillRect`+`shadowBlur` por bloque y por
+  // frame — hasta ~200 bloques de tablero + 4 fantasma + 4 pieza activa
+  // (spec 11).
+  const blockSprites: Record<number, HTMLCanvasElement> = {};
+  const blockSpriteCtxs: Record<number, CanvasRenderingContext2D> = {};
+  const nextPreviewSprites: Record<number, HTMLCanvasElement> = {};
+  const nextPreviewSpriteCtxs: Record<number, CanvasRenderingContext2D> = {};
+  for (let colorIndex = 1; colorIndex <= 8; colorIndex++) {
+    const sprite = document.createElement('canvas');
+    sprite.width = BLOCK_SPRITE_SIZE;
+    sprite.height = BLOCK_SPRITE_SIZE;
+    blockSprites[colorIndex] = sprite;
+    blockSpriteCtxs[colorIndex] = sprite.getContext('2d')!;
+
+    const previewSprite = document.createElement('canvas');
+    previewSprite.width = NB_SPRITE_SIZE;
+    previewSprite.height = NB_SPRITE_SIZE;
+    nextPreviewSprites[colorIndex] = previewSprite;
+    nextPreviewSpriteCtxs[colorIndex] = previewSprite.getContext('2d')!;
+  }
 
   const board: number[][] = createBoard();
   let current: Piece;
@@ -331,8 +378,91 @@ export function createGame(
     }
   }
 
+  function buildBoardStaticLayer() {
+    // Fondo + rejilla del tablero (spec 11, técnica de `staticLayer` de
+    // Frogger): antes se retrazaban 2 `fillRect` + 28 `stroke()` cada frame
+    // pese a no cambiar nunca entre frames; ahora se hornean una sola vez
+    // (aquí y en `setSkin`) y se blitean con un único `drawImage`.
+    boardStaticCtx.fillStyle = palette.boardBg;
+    boardStaticCtx.fillRect(0, 0, W, H);
+    boardStaticCtx.strokeStyle = palette.gridLine;
+    boardStaticCtx.lineWidth = 0.5;
+    for (let c = 1; c < COLS; c++) {
+      boardStaticCtx.beginPath();
+      boardStaticCtx.moveTo(c * BLOCK, 0);
+      boardStaticCtx.lineTo(c * BLOCK, ROWS * BLOCK);
+      boardStaticCtx.stroke();
+    }
+    for (let r = 1; r < ROWS; r++) {
+      boardStaticCtx.beginPath();
+      boardStaticCtx.moveTo(0, r * BLOCK);
+      boardStaticCtx.lineTo(COLS * BLOCK, r * BLOCK);
+      boardStaticCtx.stroke();
+    }
+  }
+
+  function buildPanelStaticLayer() {
+    // Fondo, overlay, borde y las 4 etiquetas fijas (SCORE/LINES/LEVEL/NEXT)
+    // nunca cambian entre frames — solo los valores numéricos lo hacen. Se
+    // hornea todo lo estático una sola vez (spec 11).
+    panelStaticCtx.clearRect(0, 0, PANEL_W, CANVAS_H);
+    panelStaticCtx.fillStyle = palette.panelBg;
+    panelStaticCtx.fillRect(0, 0, PANEL_W, CANVAS_H);
+    panelStaticCtx.fillStyle = palette.panelOverlay;
+    panelStaticCtx.fillRect(0, 0, PANEL_W, CANVAS_H);
+    panelStaticCtx.strokeStyle = palette.panelBorder;
+    panelStaticCtx.lineWidth = 1;
+    panelStaticCtx.beginPath();
+    panelStaticCtx.moveTo(0, 0);
+    panelStaticCtx.lineTo(0, CANVAS_H);
+    panelStaticCtx.stroke();
+
+    const labelX = 16;
+    panelStaticCtx.textAlign = 'left';
+    panelStaticCtx.fillStyle = palette.labelColor;
+    panelStaticCtx.font = 'bold 13px monospace';
+    panelStaticCtx.fillText('SCORE', labelX, 30);
+    panelStaticCtx.fillText('LINES', labelX, 96);
+    panelStaticCtx.fillText('LEVEL', labelX, 162);
+    panelStaticCtx.fillText('NEXT', labelX, 228);
+  }
+
+  function buildBlockSprites() {
+    // Un sprite offscreen por color de pieza (8 variantes), a las 2 escalas
+    // usadas (tablero `BLOCK` y preview `NB`): el `shadowBlur` se hornea una
+    // sola vez por color aquí (y en `setSkin`) en vez de asignarse en vivo
+    // por cada bloque dibujado — hasta ~208 veces por frame en el peor caso
+    // (tablero casi lleno + pieza activa + fantasma), spec 11.
+    for (let colorIndex = 1; colorIndex <= 8; colorIndex++) {
+      const color = palette.pieces[colorIndex]!;
+
+      const bctx = blockSpriteCtxs[colorIndex];
+      bctx.clearRect(0, 0, BLOCK_SPRITE_SIZE, BLOCK_SPRITE_SIZE);
+      bctx.fillStyle = color;
+      if (palette.glow) {
+        bctx.shadowColor = color;
+        bctx.shadowBlur = palette.glowBlur;
+      }
+      bctx.fillRect(GLOW_MARGIN + 1, GLOW_MARGIN + 1, BLOCK - 2, BLOCK - 2);
+      if (palette.glow) bctx.shadowBlur = 0;
+      bctx.fillStyle = palette.blockHighlight;
+      bctx.fillRect(GLOW_MARGIN + 1, GLOW_MARGIN + 1, BLOCK - 2, 4);
+
+      const pctx = nextPreviewSpriteCtxs[colorIndex];
+      pctx.clearRect(0, 0, NB_SPRITE_SIZE, NB_SPRITE_SIZE);
+      pctx.fillStyle = color;
+      if (palette.glow) {
+        pctx.shadowColor = color;
+        pctx.shadowBlur = palette.glowBlur;
+      }
+      pctx.fillRect(GLOW_MARGIN + 1, GLOW_MARGIN + 1, NB - 2, NB - 2);
+      if (palette.glow) pctx.shadowBlur = 0;
+      pctx.fillStyle = palette.blockHighlight;
+      pctx.fillRect(GLOW_MARGIN + 1, GLOW_MARGIN + 1, NB - 2, 4);
+    }
+  }
+
   function drawBlock(
-    context: CanvasRenderingContext2D,
     x: number,
     y: number,
     colorIndex: number,
@@ -340,140 +470,66 @@ export function createGame(
     alpha?: number,
   ) {
     if (!colorIndex) return;
-    const color = palette.pieces[colorIndex]!;
-    context.globalAlpha = alpha ?? 1;
-    if (palette.glow) {
-      context.shadowColor = color;
-      context.shadowBlur = palette.glowBlur;
-    }
-    context.fillStyle = color;
-    context.fillRect(x * size + 1, y * size + 1, size - 2, size - 2);
-    if (palette.glow) context.shadowBlur = 0;
-    context.fillStyle = palette.blockHighlight;
-    context.fillRect(x * size + 1, y * size + 1, size - 2, 4);
-    context.globalAlpha = 1;
-  }
-
-  function drawGrid() {
-    ctx.strokeStyle = palette.gridLine;
-    ctx.lineWidth = 0.5;
-    for (let c = 1; c < COLS; c++) {
-      ctx.beginPath();
-      ctx.moveTo(c * BLOCK, 0);
-      ctx.lineTo(c * BLOCK, ROWS * BLOCK);
-      ctx.stroke();
-    }
-    for (let r = 1; r < ROWS; r++) {
-      ctx.beginPath();
-      ctx.moveTo(0, r * BLOCK);
-      ctx.lineTo(COLS * BLOCK, r * BLOCK);
-      ctx.stroke();
-    }
+    // Sprite offscreen cacheado (`buildBlockSprites`, spec 11): el glow ya
+    // viene horneado, sin `shadowBlur` en vivo por bloque y por frame.
+    ctx.globalAlpha = alpha ?? 1;
+    ctx.drawImage(
+      blockSprites[colorIndex],
+      x * size - GLOW_MARGIN,
+      y * size - GLOW_MARGIN,
+    );
+    ctx.globalAlpha = 1;
   }
 
   function drawBoard() {
-    ctx.fillStyle = palette.boardBg;
-    ctx.fillRect(0, 0, W, H);
-    drawGrid();
+    // Capa estática cacheada (`buildBoardStaticLayer`, spec 11): un único
+    // `drawImage` en vez de 2 `fillRect` + 28 `stroke()` por frame.
+    ctx.drawImage(boardStaticLayer, 0, 0);
 
     for (let r = 0; r < ROWS; r++)
-      for (let c = 0; c < COLS; c++) drawBlock(ctx, c, r, board[r][c], BLOCK);
+      for (let c = 0; c < COLS; c++) drawBlock(c, r, board[r][c], BLOCK);
 
     const gy = ghostY();
     for (let r = 0; r < current.shape.length; r++)
       for (let c = 0; c < current.shape[r].length; c++)
         if (current.shape[r][c])
-          drawBlock(
-            ctx,
-            current.x + c,
-            gy + r,
-            current.shape[r][c],
-            BLOCK,
-            0.2,
-          );
+          drawBlock(current.x + c, gy + r, current.shape[r][c], BLOCK, 0.2);
 
     for (let r = 0; r < current.shape.length; r++)
       for (let c = 0; c < current.shape[r].length; c++)
-        drawBlock(
-          ctx,
-          current.x + c,
-          current.y + r,
-          current.shape[r][c],
-          BLOCK,
-        );
+        drawBlock(current.x + c, current.y + r, current.shape[r][c], BLOCK);
   }
 
   function drawNextPreview(x: number, y: number) {
-    const NB = 24;
     const shape = next.shape;
     const offX = Math.floor((4 - shape[0].length) / 2);
     const offY = Math.floor((4 - shape.length) / 2);
     for (let r = 0; r < shape.length; r++)
       for (let c = 0; c < shape[r].length; c++) {
         if (!shape[r][c]) continue;
-        const color = palette.pieces[shape[r][c]]!;
-        ctx.globalAlpha = 1;
-        if (palette.glow) {
-          ctx.shadowColor = color;
-          ctx.shadowBlur = palette.glowBlur;
-        }
-        ctx.fillStyle = color;
-        ctx.fillRect(
-          x + (offX + c) * NB + 1,
-          y + (offY + r) * NB + 1,
-          NB - 2,
-          NB - 2,
-        );
-        if (palette.glow) ctx.shadowBlur = 0;
-        ctx.fillStyle = palette.blockHighlight;
-        ctx.fillRect(
-          x + (offX + c) * NB + 1,
-          y + (offY + r) * NB + 1,
-          NB - 2,
-          4,
+        // Sprite offscreen cacheado (`buildBlockSprites`, spec 11), a la
+        // escala del panel NEXT — mismo glow horneado que el tablero.
+        ctx.drawImage(
+          nextPreviewSprites[shape[r][c]],
+          x + (offX + c) * NB - GLOW_MARGIN,
+          y + (offY + r) * NB - GLOW_MARGIN,
         );
       }
   }
 
   function drawPanel() {
-    ctx.fillStyle = palette.panelBg;
-    ctx.fillRect(PANEL_X, 0, PANEL_W, CANVAS_H);
-    ctx.fillStyle = palette.panelOverlay;
-    ctx.fillRect(PANEL_X, 0, PANEL_W, CANVAS_H);
-    ctx.strokeStyle = palette.panelBorder;
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(PANEL_X, 0);
-    ctx.lineTo(PANEL_X, CANVAS_H);
-    ctx.stroke();
+    // Capa estática cacheada (`buildPanelStaticLayer`, spec 11): fondo,
+    // overlay, borde y las 4 etiquetas fijas se blitean con un único
+    // `drawImage`; solo los valores numéricos y el preview se redibujan.
+    ctx.drawImage(panelStaticLayer, PANEL_X, 0);
 
     const labelX = PANEL_X + 16;
-
     ctx.textAlign = 'left';
-    ctx.fillStyle = palette.labelColor;
-    ctx.font = 'bold 13px monospace';
-    ctx.fillText('SCORE', labelX, 30);
     ctx.fillStyle = palette.valueColor;
     ctx.font = 'bold 20px monospace';
     ctx.fillText(score.toLocaleString(), labelX, 56);
-
-    ctx.fillStyle = palette.labelColor;
-    ctx.font = 'bold 13px monospace';
-    ctx.fillText('LINES', labelX, 96);
-    ctx.fillStyle = palette.valueColor;
-    ctx.font = 'bold 20px monospace';
     ctx.fillText(String(lines), labelX, 122);
-
-    ctx.fillStyle = palette.labelColor;
-    ctx.font = 'bold 13px monospace';
-    ctx.fillText('LEVEL', labelX, 162);
-    ctx.fillStyle = palette.valueColor;
-    ctx.font = 'bold 20px monospace';
     ctx.fillText(String(level), labelX, 188);
-
-    ctx.fillStyle = palette.labelColor;
-    ctx.font = 'bold 13px monospace';
-    ctx.fillText('NEXT', labelX, 228);
     drawNextPreview(labelX, 244);
   }
 
@@ -601,6 +657,9 @@ export function createGame(
   callbacks.onScoreChange(score);
   callbacks.onLevelChange(level);
   callbacks.onLivesChange(1);
+  buildBoardStaticLayer();
+  buildPanelStaticLayer();
+  buildBlockSprites();
   draw();
   rafId = requestAnimationFrame(loop);
 
@@ -617,6 +676,14 @@ export function createGame(
     },
     setSkin(skin: SkinName) {
       palette = SKIN_PALETTES[skin];
+      // El fondo del tablero, el panel lateral y los sprites de bloque
+      // (pieza activa, fantasma, preview) viven en canvas offscreen
+      // cacheados: hay que regenerarlos todos con la nueva paleta antes de
+      // repintar el frame actual (mismo contrato que `frogger/engine.ts`,
+      // spec 11), sin tocar el estado de la partida en curso.
+      buildBoardStaticLayer();
+      buildPanelStaticLayer();
+      buildBlockSprites();
       draw();
     },
   };
