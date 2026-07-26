@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/app/context/auth-context';
 import { GAME_ENGINES, type EngineInstance } from '@/app/game-engines/registry';
@@ -22,9 +22,6 @@ export default function GamePlayClient({ game }: { game: Game }) {
   const entry = GAME_ENGINES[game.id];
   const isTouch = useTouchDevice();
 
-  const [score, setScore] = useState(0);
-  const [lives, setLives] = useState(3);
-  const [level, setLevel] = useState(1);
   const [paused, setPaused] = useState(false);
   const [over, setOver] = useState(false);
   const [name, setName] = useState(user ? user.name : 'INVITADO');
@@ -36,19 +33,91 @@ export default function GamePlayClient({ game }: { game: Game }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const engineRef = useRef<EngineInstance | null>(null);
 
+  // `score`/`lives`/`level` cambian por cada avance de fila/vida/nivel del
+  // engine: se guardan en refs (sin disparar re-render de React) y se
+  // reflejan en el DOM directamente a través de los nodos referenciados más
+  // abajo (spec 11, paso 4). El JSX de estos nodos nunca depende del valor
+  // cambiante como children, para que un re-render por otro motivo (pausa,
+  // skin, modal) no lo sobrescriba con un valor obsoleto.
+  const scoreRef = useRef(0);
+  const livesRef = useRef(3);
+  const levelRef = useRef(1);
+  const scoreElRef = useRef<HTMLDivElement | null>(null);
+  const livesElRef = useRef<HTMLDivElement | null>(null);
+  const levelElRef = useRef<HTMLDivElement | null>(null);
+  const finalScoreElRef = useRef<HTMLDivElement | null>(null);
+  const isTouchRef = useRef(isTouch);
+
+  const renderScore = (next: number) => {
+    const formatted = next.toLocaleString('es-ES');
+    if (scoreElRef.current) {
+      scoreElRef.current.textContent = formatted;
+    }
+    // El motor no se detiene solo porque se abra el modal de "FIN DEL JUEGO"
+    // (`endGame` no llama a `pause()`/`destroy()`, es comportamiento previo a
+    // este spec): si sigue emitiendo `onScoreChange` con el modal abierto, el
+    // puntaje del modal debe seguir en vivo igual que el del HUD, tal como
+    // ocurría antes cuando ambos leían el mismo estado de React.
+    if (finalScoreElRef.current) {
+      finalScoreElRef.current.textContent = formatted;
+    }
+  };
+  const renderLives = (next: number) => {
+    const el = livesElRef.current;
+    if (!el) return;
+    if (next <= 0) {
+      el.textContent = '—';
+    } else if (isTouchRef.current) {
+      el.innerHTML = `<span class="lives-compact"><span>♥</span><span>X${next}</span></span>`;
+    } else {
+      el.textContent = '♥ '.repeat(next).trim();
+    }
+  };
+  const renderLevel = (next: number) => {
+    if (levelElRef.current) {
+      levelElRef.current.textContent = String(next).padStart(2, '0');
+    }
+  };
+
+  useEffect(() => {
+    isTouchRef.current = isTouch;
+    renderLives(livesRef.current);
+  }, [isTouch]);
+
+  // El puntaje final del modal se lee desde `scoreRef` dentro de un efecto
+  // (nunca durante el render, ver reglas de `react-hooks/refs`) justo cuando
+  // el modal aparece, evitando un `useState` que se actualizaría en cada
+  // avance de puntaje durante la partida.
+  useLayoutEffect(() => {
+    if (over && finalScoreElRef.current) {
+      finalScoreElRef.current.textContent =
+        scoreRef.current.toLocaleString('es-ES');
+    }
+  }, [over]);
+
   const startEngine = (skinOverride?: SkinName) => {
     if (!canvasRef.current) return;
     engineRef.current = entry.createGame(
       canvasRef.current,
       {
-        onScoreChange: setScore,
-        onLivesChange: setLives,
+        onScoreChange: (next) => {
+          scoreRef.current = next;
+          renderScore(next);
+        },
+        onLivesChange: (next) => {
+          livesRef.current = next;
+          renderLives(next);
+        },
         onGameOver: (finalScore) => {
-          setScore(finalScore);
+          scoreRef.current = finalScore;
+          renderScore(finalScore);
           setOver(true);
         },
         onPauseChange: setPaused,
-        onLevelChange: setLevel,
+        onLevelChange: (next) => {
+          levelRef.current = next;
+          renderLevel(next);
+        },
       },
       { skin: skinOverride ?? skin },
     );
@@ -90,7 +159,7 @@ export default function GamePlayClient({ game }: { game: Game }) {
     setSaving(true);
     setSaveError(null);
     try {
-      await saveScore(game.id, name, score);
+      await saveScore(game.id, name, scoreRef.current);
       setSaved(true);
     } catch {
       setSaveError('No se pudo guardar la puntuación. Intenta de nuevo.');
@@ -117,26 +186,28 @@ export default function GamePlayClient({ game }: { game: Game }) {
           </div>
           <div className="hud-stat">
             <div className="l">{isTouch ? 'PTS' : 'Puntuación'}</div>
-            <div className="v">{score.toLocaleString('es-ES')}</div>
+            <div className="v" ref={scoreElRef}>
+              {(0).toLocaleString('es-ES')}
+            </div>
           </div>
           <div className="hud-stat lives">
             <div className="l">{isTouch ? 'VIDA' : 'Vidas'}</div>
-            <div className="v">
-              {lives <= 0 ? (
-                '—'
-              ) : isTouch ? (
+            <div className="v" ref={livesElRef}>
+              {isTouch ? (
                 <span className="lives-compact">
                   <span>♥</span>
-                  <span>X{lives}</span>
+                  <span>X3</span>
                 </span>
               ) : (
-                '♥ '.repeat(lives).trim()
+                '♥ ♥ ♥'
               )}
             </div>
           </div>
           <div className="hud-stat level">
             <div className="l">{isTouch ? 'NV' : 'Nivel'}</div>
-            <div className="v">{String(level).padStart(2, '0')}</div>
+            <div className="v" ref={levelElRef}>
+              01
+            </div>
           </div>
         </div>
         <div className="hud-actions">
@@ -222,7 +293,9 @@ export default function GamePlayClient({ game }: { game: Game }) {
           <div className="modal">
             <h2>FIN DEL JUEGO</h2>
             <div className="final-label">PUNTUACIÓN FINAL</div>
-            <div className="final">{score.toLocaleString('es-ES')}</div>
+            <div className="final" ref={finalScoreElRef}>
+              {(0).toLocaleString('es-ES')}
+            </div>
             {!saved ? (
               <div className="input-row">
                 <input

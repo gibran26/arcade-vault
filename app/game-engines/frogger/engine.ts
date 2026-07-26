@@ -49,6 +49,46 @@ const TURTLE_CYCLE_MS =
 
 const COLLISION_INSET = 4;
 
+// El ripple del agua es una onda viajera: sin(x*RIPPLE_WAVE_FREQ + t*RIPPLE_TIME_FREQ + line + lane.row)
+// solo se traslada horizontalmente con el tiempo, nunca cambia de forma. Por eso se puede
+// precalcular una sola vez en un tile offscreen y desplazarlo por frame en vez de recalcular
+// el `Math.sin` de cada punto cada vez (ver spec 11, paso 2).
+const RIPPLE_WAVE_FREQ = 0.08;
+const RIPPLE_TIME_FREQ = 2;
+const RIPPLE_PERIOD = (Math.PI * 2) / RIPPLE_WAVE_FREQ;
+const RIPPLE_TILE_W = Math.ceil(CANVAS_W + RIPPLE_PERIOD);
+const RIPPLE_SCROLL_PX_PER_SEC = RIPPLE_TIME_FREQ / RIPPLE_WAVE_FREQ;
+
+// Margen de sangrado reservado en los sprites que hornean el `shadowBlur` (spec 11, paso 3):
+// cubre con holgura el desenfoque visible incluso en el glowBlur más alto del catálogo (14, `neon`).
+const GLOW_MARGIN = 28;
+
+// Sprite del caparazón (recibe el glow, horneado en `buildTurtleSprites`) y sprite de
+// detalle (líneas + aletas, sin glow), separados para no alterar qué parte de la tortuga
+// brilla en `neon`/`retro` (ver drawTurtleGroup).
+const TURTLE_SHELL_SPRITE_W = Math.ceil((CELL * 0.42 + GLOW_MARGIN) * 2);
+const TURTLE_SHELL_SPRITE_H = Math.ceil((CELL * 0.3 + GLOW_MARGIN) * 2);
+const TURTLE_DETAIL_SPRITE_W = Math.ceil((CELL * 0.4 + 5 + 2) * 2);
+const TURTLE_DETAIL_SPRITE_H = Math.ceil((CELL * 0.34 + 2) * 2);
+
+// Troncos: solo existen 2 anchos posibles (`generateFloatItems` usa `randomItem([2, 3])`),
+// así que alcanza con cachear 2 variantes en vez de un sprite por instancia.
+const LOG_SPRITE_W: Record<2 | 3, number> = {
+  2: Math.ceil(2 * CELL + GLOW_MARGIN * 2),
+  3: Math.ceil(3 * CELL + GLOW_MARGIN * 2),
+};
+const LOG_SPRITE_H = Math.ceil(CELL + GLOW_MARGIN * 2);
+
+// Sapo: el cuerpo+patas no dependen de la dirección, pero los ojos sí — solo hay 4
+// direcciones posibles, así que se cachean 4 variantes completas (ver `dirKey`).
+type FrogDirKey = 'up' | 'down' | 'left' | 'right';
+const FROG_DIR_KEYS: FrogDirKey[] = ['up', 'down', 'left', 'right'];
+const FROG_SPRITE_HALF_W = Math.ceil(CELL * 0.4 + GLOW_MARGIN);
+const FROG_SPRITE_HALF_H = Math.ceil(CELL * 0.5 + GLOW_MARGIN);
+
+const GOAL_OCCUPANT_SPRITE_HALF_W = Math.ceil(CELL * 0.24 + GLOW_MARGIN);
+const GOAL_OCCUPANT_SPRITE_HALF_H = Math.ceil(CELL * 0.2 + GLOW_MARGIN);
+
 interface FroggerPalette {
   grassBg: string;
   grassDot: string;
@@ -249,6 +289,49 @@ export function createGame(
   staticLayer.height = CANVAS_H;
   const staticCtx = staticLayer.getContext('2d')!;
 
+  const rippleTile = document.createElement('canvas');
+  rippleTile.width = RIPPLE_TILE_W;
+  rippleTile.height = CELL;
+  const rippleTileCtx = rippleTile.getContext('2d')!;
+
+  const turtleShellSprite = document.createElement('canvas');
+  turtleShellSprite.width = TURTLE_SHELL_SPRITE_W;
+  turtleShellSprite.height = TURTLE_SHELL_SPRITE_H;
+  const turtleShellCtx = turtleShellSprite.getContext('2d')!;
+
+  const turtleDetailSprite = document.createElement('canvas');
+  turtleDetailSprite.width = TURTLE_DETAIL_SPRITE_W;
+  turtleDetailSprite.height = TURTLE_DETAIL_SPRITE_H;
+  const turtleDetailCtx = turtleDetailSprite.getContext('2d')!;
+
+  const logSprites: Record<2 | 3, HTMLCanvasElement> = {
+    2: document.createElement('canvas'),
+    3: document.createElement('canvas'),
+  };
+  const logSpriteCtxs: Record<2 | 3, CanvasRenderingContext2D> = {
+    2: logSprites[2].getContext('2d')!,
+    3: logSprites[3].getContext('2d')!,
+  };
+  for (const key of [2, 3] as const) {
+    logSprites[key].width = LOG_SPRITE_W[key];
+    logSprites[key].height = LOG_SPRITE_H;
+  }
+
+  const frogSprites = {} as Record<FrogDirKey, HTMLCanvasElement>;
+  const frogSpriteCtxs = {} as Record<FrogDirKey, CanvasRenderingContext2D>;
+  for (const key of FROG_DIR_KEYS) {
+    const sprite = document.createElement('canvas');
+    sprite.width = FROG_SPRITE_HALF_W * 2;
+    sprite.height = FROG_SPRITE_HALF_H * 2;
+    frogSprites[key] = sprite;
+    frogSpriteCtxs[key] = sprite.getContext('2d')!;
+  }
+
+  const goalOccupantSprite = document.createElement('canvas');
+  goalOccupantSprite.width = GOAL_OCCUPANT_SPRITE_HALF_W * 2;
+  goalOccupantSprite.height = GOAL_OCCUPANT_SPRITE_HALF_H * 2;
+  const goalOccupantCtx = goalOccupantSprite.getContext('2d')!;
+
   let score = 0;
   let lives = 3;
   let level = 1;
@@ -419,60 +502,246 @@ export function createGame(
     if (palette.glow) staticCtx.shadowBlur = 0;
   }
 
+  function buildRippleTile() {
+    rippleTileCtx.clearRect(0, 0, RIPPLE_TILE_W, CELL);
+    rippleTileCtx.strokeStyle = palette.waterRipple;
+    rippleTileCtx.lineWidth = 1.5;
+    for (let line = 0; line < 3; line++) {
+      const baseY = 10 + line * 10;
+      rippleTileCtx.beginPath();
+      for (let x = 0; x <= RIPPLE_TILE_W; x += 4) {
+        const wave = Math.sin(x * RIPPLE_WAVE_FREQ + line) * 2.5;
+        if (x === 0) rippleTileCtx.moveTo(x, baseY + wave);
+        else rippleTileCtx.lineTo(x, baseY + wave);
+      }
+      rippleTileCtx.stroke();
+    }
+  }
+
+  function buildTurtleSprites() {
+    turtleShellCtx.clearRect(
+      0,
+      0,
+      TURTLE_SHELL_SPRITE_W,
+      TURTLE_SHELL_SPRITE_H,
+    );
+    turtleShellCtx.fillStyle = palette.turtleShell;
+    // El glow se hornea una sola vez aquí (en vez de aplicar `shadowBlur` en
+    // cada segmento por frame, spec 11 paso 3): mismo `glowBlur*0.5` que antes.
+    if (palette.glow) {
+      turtleShellCtx.shadowColor = palette.turtleShell;
+      turtleShellCtx.shadowBlur = palette.glowBlur * 0.5;
+    }
+    turtleShellCtx.beginPath();
+    turtleShellCtx.ellipse(
+      TURTLE_SHELL_SPRITE_W / 2,
+      TURTLE_SHELL_SPRITE_H / 2,
+      CELL * 0.42,
+      CELL * 0.3,
+      0,
+      0,
+      Math.PI * 2,
+    );
+    turtleShellCtx.fill();
+    if (palette.glow) turtleShellCtx.shadowBlur = 0;
+
+    turtleDetailCtx.clearRect(
+      0,
+      0,
+      TURTLE_DETAIL_SPRITE_W,
+      TURTLE_DETAIL_SPRITE_H,
+    );
+    const dcx = TURTLE_DETAIL_SPRITE_W / 2;
+    const dcy = TURTLE_DETAIL_SPRITE_H / 2;
+    turtleDetailCtx.strokeStyle = palette.turtleShellLine;
+    turtleDetailCtx.lineWidth = 1.5;
+    turtleDetailCtx.beginPath();
+    turtleDetailCtx.arc(dcx, dcy, CELL * 0.22, 0, Math.PI * 2);
+    turtleDetailCtx.stroke();
+    turtleDetailCtx.beginPath();
+    turtleDetailCtx.arc(dcx, dcy, CELL * 0.34, Math.PI * 0.15, Math.PI * 0.85);
+    turtleDetailCtx.stroke();
+    turtleDetailCtx.fillStyle = palette.turtleSkin;
+    turtleDetailCtx.beginPath();
+    turtleDetailCtx.ellipse(dcx - CELL * 0.4, dcy, 5, 3.5, 0, 0, Math.PI * 2);
+    turtleDetailCtx.fill();
+    turtleDetailCtx.beginPath();
+    turtleDetailCtx.ellipse(dcx + CELL * 0.4, dcy, 5, 3.5, 0, 0, Math.PI * 2);
+    turtleDetailCtx.fill();
+  }
+
+  function buildLogSprites() {
+    for (const widthCells of [2, 3] as const) {
+      const lctx = logSpriteCtxs[widthCells];
+      const w = LOG_SPRITE_W[widthCells];
+      const widthPx = widthCells * CELL;
+      lctx.clearRect(0, 0, w, LOG_SPRITE_H);
+      lctx.fillStyle = palette.logFill;
+      // Glow horneado una sola vez (antes se aplicaba `shadowBlur` por tronco cada frame).
+      if (palette.glow) {
+        lctx.shadowColor = palette.logFill;
+        lctx.shadowBlur = palette.glowBlur * 0.6;
+      }
+      lctx.beginPath();
+      lctx.roundRect(GLOW_MARGIN, GLOW_MARGIN + 6, widthPx, CELL - 12, 8);
+      lctx.fill();
+      if (palette.glow) lctx.shadowBlur = 0;
+      lctx.strokeStyle = palette.logVein;
+      lctx.lineWidth = 1.5;
+      for (let i = 1; i < 3; i++) {
+        const vy = GLOW_MARGIN + 6 + (i * (CELL - 12)) / 3;
+        lctx.beginPath();
+        lctx.moveTo(GLOW_MARGIN + 6, vy);
+        lctx.lineTo(GLOW_MARGIN + widthPx - 6, vy);
+        lctx.stroke();
+      }
+    }
+  }
+
+  function buildGoalOccupantSprite() {
+    const cx = GOAL_OCCUPANT_SPRITE_HALF_W;
+    const cy = GOAL_OCCUPANT_SPRITE_HALF_H;
+    goalOccupantCtx.clearRect(
+      0,
+      0,
+      GOAL_OCCUPANT_SPRITE_HALF_W * 2,
+      GOAL_OCCUPANT_SPRITE_HALF_H * 2,
+    );
+    goalOccupantCtx.fillStyle = palette.goalOccupant;
+    if (palette.glow) {
+      goalOccupantCtx.shadowColor = palette.goalOccupant;
+      goalOccupantCtx.shadowBlur = palette.glowBlur * 0.6;
+    }
+    goalOccupantCtx.beginPath();
+    goalOccupantCtx.ellipse(cx, cy, CELL * 0.24, CELL * 0.2, 0, 0, Math.PI * 2);
+    goalOccupantCtx.fill();
+    if (palette.glow) goalOccupantCtx.shadowBlur = 0;
+    goalOccupantCtx.fillStyle = palette.frogDark;
+    goalOccupantCtx.beginPath();
+    goalOccupantCtx.arc(cx - 5, cy - 5, 2, 0, Math.PI * 2);
+    goalOccupantCtx.fill();
+    goalOccupantCtx.beginPath();
+    goalOccupantCtx.arc(cx + 5, cy - 5, 2, 0, Math.PI * 2);
+    goalOccupantCtx.fill();
+  }
+
+  function frogDirKey(dx: number, dy: number): FrogDirKey {
+    if (dx === 1) return 'right';
+    if (dx === -1) return 'left';
+    if (dy === 1) return 'down';
+    return 'up';
+  }
+
+  function frogEyeOffsets(dir: FrogDirKey): {
+    e1: { x: number; y: number };
+    e2: { x: number; y: number };
+  } {
+    const eyeSpread = 10;
+    if (dir === 'right') return { e1: { x: 6, y: -18 }, e2: { x: 6, y: -6 } };
+    if (dir === 'left') return { e1: { x: -6, y: -18 }, e2: { x: -6, y: -6 } };
+    if (dir === 'down') return { e1: { x: -8, y: -2 }, e2: { x: 8, y: -2 } };
+    return { e1: { x: -eyeSpread, y: -14 }, e2: { x: eyeSpread, y: -14 } };
+  }
+
+  function frogDirVector(dir: FrogDirKey): { dx: number; dy: number } {
+    if (dir === 'right') return { dx: 1, dy: 0 };
+    if (dir === 'left') return { dx: -1, dy: 0 };
+    if (dir === 'down') return { dx: 0, dy: 1 };
+    return { dx: 0, dy: -1 };
+  }
+
+  function buildFrogSprites() {
+    const cx = FROG_SPRITE_HALF_W;
+    const cy = FROG_SPRITE_HALF_H;
+    for (const dir of FROG_DIR_KEYS) {
+      const fctx = frogSpriteCtxs[dir];
+      fctx.clearRect(0, 0, cx * 2, cy * 2);
+
+      fctx.fillStyle = palette.frogBody;
+      // Glow horneado una sola vez, solo sobre el cuerpo (igual que el dibujo
+      // original: patas y ojos nunca tuvieron `shadowBlur`).
+      if (palette.glow) {
+        fctx.shadowColor = palette.frogBody;
+        fctx.shadowBlur = palette.glowBlur;
+      }
+      fctx.beginPath();
+      fctx.ellipse(cx, cy + 2, CELL * 0.34, CELL * 0.3, 0, 0, Math.PI * 2);
+      fctx.fill();
+      if (palette.glow) fctx.shadowBlur = 0;
+
+      fctx.fillStyle = palette.frogDark;
+      const legOffsets = [
+        [-CELL * 0.32, -CELL * 0.12],
+        [CELL * 0.32, -CELL * 0.12],
+        [-CELL * 0.3, CELL * 0.28],
+        [CELL * 0.3, CELL * 0.28],
+      ];
+      for (const [lx, ly] of legOffsets) {
+        fctx.beginPath();
+        fctx.ellipse(cx + lx, cy + ly, 5, 3, 0, 0, Math.PI * 2);
+        fctx.fill();
+      }
+
+      const { dx, dy } = frogDirVector(dir);
+      const { e1, e2 } = frogEyeOffsets(dir);
+      for (const eye of [e1, e2]) {
+        fctx.fillStyle = palette.frogEyeWhite;
+        fctx.beginPath();
+        fctx.arc(cx + eye.x, cy + eye.y, 5, 0, Math.PI * 2);
+        fctx.fill();
+        fctx.fillStyle = palette.frogDark;
+        fctx.beginPath();
+        fctx.arc(
+          cx + eye.x + dx * 1.5,
+          cy + eye.y + dy * 1.5,
+          2.2,
+          0,
+          Math.PI * 2,
+        );
+        fctx.fill();
+      }
+    }
+  }
+
   function currentGlobalTimeSeconds(): number {
     return elapsedMs / 1000;
   }
 
   function drawWaterAndLogs() {
+    const t = currentGlobalTimeSeconds();
+    const timeShift = t * RIPPLE_SCROLL_PX_PER_SEC;
     for (const lane of riverLanes) {
       const y = lane.row * CELL;
       ctx.fillStyle = palette.waterBg;
       ctx.fillRect(0, y, CANVAS_W, CELL);
 
-      ctx.strokeStyle = palette.waterRipple;
-      ctx.lineWidth = 1.5;
-      const t = currentGlobalTimeSeconds();
-      for (let line = 0; line < 3; line++) {
-        const baseY = y + 10 + line * 10;
-        ctx.beginPath();
-        for (let x = 0; x <= CANVAS_W; x += 8) {
-          const wave = Math.sin(x * 0.08 + t * 2 + line + lane.row) * 2.5;
-          if (x === 0) ctx.moveTo(x, baseY + wave);
-          else ctx.lineTo(x, baseY + wave);
-        }
-        ctx.stroke();
-      }
+      // El ripple es la misma onda viajera para todos los carriles: el tile
+      // cacheado (`buildRippleTile`) ya trae las 3 líneas, solo se traslada
+      // horizontalmente según el tiempo y la fase fija de este carril.
+      const laneShift = lane.row / RIPPLE_WAVE_FREQ;
+      let offset = (timeShift + laneShift) % RIPPLE_PERIOD;
+      if (offset < 0) offset += RIPPLE_PERIOD;
+      ctx.drawImage(rippleTile, -offset, y, RIPPLE_TILE_W, CELL);
 
       for (const item of lane.items) {
-        const widthPx = item.widthCells * CELL;
         if (lane.isTurtle) {
           drawTurtleGroup(item, y, lane.cyclePhaseOffset);
         } else {
-          drawLog(item, y, widthPx);
+          drawLog(item, y);
         }
       }
     }
   }
 
-  function drawLog(item: FloatItem, y: number, widthPx: number) {
-    ctx.fillStyle = palette.logFill;
-    if (palette.glow) {
-      ctx.shadowColor = palette.logFill;
-      ctx.shadowBlur = palette.glowBlur * 0.6;
-    }
-    ctx.beginPath();
-    ctx.roundRect(item.x, y + 6, widthPx, CELL - 12, 8);
-    ctx.fill();
-    if (palette.glow) ctx.shadowBlur = 0;
-    ctx.strokeStyle = palette.logVein;
-    ctx.lineWidth = 1.5;
-    for (let i = 1; i < 3; i++) {
-      const vy = y + 6 + (i * (CELL - 12)) / 3;
-      ctx.beginPath();
-      ctx.moveTo(item.x + 6, vy);
-      ctx.lineTo(item.x + widthPx - 6, vy);
-      ctx.stroke();
-    }
+  function drawLog(item: FloatItem, y: number) {
+    // Sprite offscreen cacheado (`buildLogSprites`, spec 11 paso 3): el glow
+    // ya viene horneado, sin `shadowBlur` en vivo por tronco y por frame.
+    const widthCells = item.widthCells === 3 ? 3 : 2;
+    ctx.drawImage(
+      logSprites[widthCells],
+      item.x - GLOW_MARGIN,
+      y - GLOW_MARGIN,
+    );
   }
 
   function turtlePhase(cyclePhaseOffset: number): {
@@ -510,30 +779,19 @@ export function createGame(
     for (let s = 0; s < segments; s++) {
       const cx = item.x + s * CELL + CELL / 2;
       const cy = y + CELL / 2 + sinkOffset;
-      ctx.fillStyle = palette.turtleShell;
-      if (palette.glow) {
-        ctx.shadowColor = palette.turtleShell;
-        ctx.shadowBlur = palette.glowBlur * 0.5;
-      }
-      ctx.beginPath();
-      ctx.ellipse(cx, cy, CELL * 0.42, CELL * 0.3, 0, 0, Math.PI * 2);
-      ctx.fill();
-      if (palette.glow) ctx.shadowBlur = 0;
-      ctx.strokeStyle = palette.turtleShellLine;
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.arc(cx, cy, CELL * 0.22, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.arc(cx, cy, CELL * 0.34, Math.PI * 0.15, Math.PI * 0.85);
-      ctx.stroke();
-      ctx.fillStyle = palette.turtleSkin;
-      ctx.beginPath();
-      ctx.ellipse(cx - CELL * 0.4, cy, 5, 3.5, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.beginPath();
-      ctx.ellipse(cx + CELL * 0.4, cy, 5, 3.5, 0, 0, Math.PI * 2);
-      ctx.fill();
+      // Caparazón y detalle (líneas + aletas) son sprites offscreen cacheados
+      // (`buildTurtleSprites`): el glow del caparazón ya viene horneado en el
+      // sprite (paso 3), sin `shadowBlur` en vivo por segmento y por frame.
+      ctx.drawImage(
+        turtleShellSprite,
+        cx - TURTLE_SHELL_SPRITE_W / 2,
+        cy - TURTLE_SHELL_SPRITE_H / 2,
+      );
+      ctx.drawImage(
+        turtleDetailSprite,
+        cx - TURTLE_DETAIL_SPRITE_W / 2,
+        cy - TURTLE_DETAIL_SPRITE_H / 2,
+      );
     }
     ctx.restore();
   }
@@ -587,26 +845,17 @@ export function createGame(
   }
 
   function drawGoalOccupants() {
+    // Sprite offscreen cacheado (`buildGoalOccupantSprite`, spec 11 paso 3):
+    // el glow ya viene horneado, sin `shadowBlur` en vivo por hueco y por frame.
     for (const hole of holes) {
       if (!hole.occupied) continue;
       const cx = hole.col * CELL + CELL / 2;
       const cy = ROW_GOAL * CELL + CELL / 2;
-      ctx.fillStyle = palette.goalOccupant;
-      if (palette.glow) {
-        ctx.shadowColor = palette.goalOccupant;
-        ctx.shadowBlur = palette.glowBlur * 0.6;
-      }
-      ctx.beginPath();
-      ctx.ellipse(cx, cy, CELL * 0.24, CELL * 0.2, 0, 0, Math.PI * 2);
-      ctx.fill();
-      if (palette.glow) ctx.shadowBlur = 0;
-      ctx.fillStyle = palette.frogDark;
-      ctx.beginPath();
-      ctx.arc(cx - 5, cy - 5, 2, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.beginPath();
-      ctx.arc(cx + 5, cy - 5, 2, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.drawImage(
+        goalOccupantSprite,
+        cx - GOAL_OCCUPANT_SPRITE_HALF_W,
+        cy - GOAL_OCCUPANT_SPRITE_HALF_H,
+      );
     }
   }
 
@@ -636,53 +885,15 @@ export function createGame(
     ctx.translate(cx, cy);
     ctx.scale(scaleX, scaleY);
 
-    ctx.fillStyle = palette.frogBody;
-    if (palette.glow) {
-      ctx.shadowColor = palette.frogBody;
-      ctx.shadowBlur = palette.glowBlur;
-    }
-    ctx.beginPath();
-    ctx.ellipse(0, 2, CELL * 0.34, CELL * 0.3, 0, 0, Math.PI * 2);
-    ctx.fill();
-    if (palette.glow) ctx.shadowBlur = 0;
-
-    ctx.fillStyle = palette.frogDark;
-    const legOffsets = [
-      [-CELL * 0.32, -CELL * 0.12],
-      [CELL * 0.32, -CELL * 0.12],
-      [-CELL * 0.3, CELL * 0.28],
-      [CELL * 0.3, CELL * 0.28],
-    ];
-    for (const [lx, ly] of legOffsets) {
-      ctx.beginPath();
-      ctx.ellipse(lx, ly, 5, 3, 0, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-    const { dx, dy } = frog.lastDir;
-    const eyeSpread = 10;
-    let e1 = { x: -eyeSpread, y: -14 };
-    let e2 = { x: eyeSpread, y: -14 };
-    if (dx === 1) {
-      e1 = { x: 6, y: -18 };
-      e2 = { x: 6, y: -6 };
-    } else if (dx === -1) {
-      e1 = { x: -6, y: -18 };
-      e2 = { x: -6, y: -6 };
-    } else if (dy === 1) {
-      e1 = { x: -8, y: -2 };
-      e2 = { x: 8, y: -2 };
-    }
-    for (const eye of [e1, e2]) {
-      ctx.fillStyle = palette.frogEyeWhite;
-      ctx.beginPath();
-      ctx.arc(eye.x, eye.y, 5, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = palette.frogDark;
-      ctx.beginPath();
-      ctx.arc(eye.x + dx * 1.5, eye.y + dy * 1.5, 2.2, 0, Math.PI * 2);
-      ctx.fill();
-    }
+    // Sprite offscreen cacheado (`buildFrogSprites`, spec 11 paso 3): cuerpo,
+    // patas y ojos ya vienen compuestos (una variante por dirección) con el
+    // glow horneado solo en el cuerpo, igual que el dibujo original.
+    const dirKey = frogDirKey(frog.lastDir.dx, frog.lastDir.dy);
+    ctx.drawImage(
+      frogSprites[dirKey],
+      -FROG_SPRITE_HALF_W,
+      -FROG_SPRITE_HALF_H,
+    );
 
     ctx.restore();
   }
@@ -993,6 +1204,11 @@ export function createGame(
 
   regenerateRoundContent();
   drawStaticLayer();
+  buildRippleTile();
+  buildTurtleSprites();
+  buildLogSprites();
+  buildGoalOccupantSprite();
+  buildFrogSprites();
   callbacks.onLivesChange(lives);
   callbacks.onLevelChange(level);
   callbacks.onScoreChange(score);
@@ -1012,11 +1228,17 @@ export function createGame(
     },
     setSkin(skin: SkinName) {
       palette = SKIN_PALETTES[skin];
-      // El fondo de agua/césped/carretera/meta vive en el canvas offscreen
-      // cacheado (`staticLayer`): hay que regenerarlo con la nueva paleta
+      // El fondo de agua/césped/carretera/meta, el tile del ripple y los
+      // sprites de tortuga/tronco/sapo/ocupante de meta viven en canvas
+      // offscreen cacheados: hay que regenerarlos todos con la nueva paleta
       // antes de repintar el frame actual, sin tocar ningún otro estado de
       // la partida en curso (score, vidas, nivel, posición del sapo, etc.).
       drawStaticLayer();
+      buildRippleTile();
+      buildTurtleSprites();
+      buildLogSprites();
+      buildGoalOccupantSprite();
+      buildFrogSprites();
       draw();
     },
   };
