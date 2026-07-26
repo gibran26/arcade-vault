@@ -103,6 +103,81 @@ interact with the document first`. En una segunda prueba con un toque simulado a
   móviles) para que el primer rebote/rotura sí suene.
 - **Estado:** abierto (causa raíz confirmada).
 
+### `GamePlayClient.tsx`: `setSkinState` dentro de un efecto dispara el lint `react-hooks/set-state-in-effect`
+
+- **Detectado en:** spec `11-optimizacion-rendimiento-frogger`, Paso 4 (reducción de `useState` a
+  `useRef` para `score`/`lives`/`level`), 25/07/2026.
+- **Archivo:** `app/game/[id]/play/GamePlayClient.tsx`, efecto de montaje (líneas 117-120):
+  ```ts
+  useEffect(() => {
+    const initialSkin = loadSkin(game.id);
+    setSkinState(initialSkin);
+    startEngine(initialSkin);
+    ...
+  }, []);
+  ```
+- **Síntoma:** `npx eslint "app/game/[id]/play/GamePlayClient.tsx"` reporta un error de la regla
+  `react-hooks/set-state-in-effect` ("Calling setState synchronously within an effect can trigger
+  cascading renders") sobre la llamada a `setSkinState(initialSkin)`.
+- **Confirmado como preexistente, no introducido por este spec:** se verificó corriendo ESLint
+  sobre la versión de este archivo en `HEAD` (antes de cualquier cambio de este spec) — el mismo
+  error ya aparecía ahí. El spec `11` solo migró `score`/`lives`/`level` a `useRef`; no tocó este
+  efecto de skin.
+- **Por qué no se corrigió en este spec:** `11-optimizacion-rendimiento-frogger` está acotado a
+  rendimiento del engine de Frogger y al patrón de estado de `score`/`lives`/`level`; este efecto
+  de skin es un problema preexistente y no relacionado, y corregirlo habría sido alcance no
+  comprometido en el plan.
+- **Por qué no bloquea el build:** en esta versión de Next.js (16.2.10), `npm run build` (`next
+build`) no ejecuta ESLint — solo compila TypeScript (verificado corriendo el build completo,
+  que termina sin pasos de lint en su output). El error solo aparece al correr `eslint`
+  explícitamente (`npm run lint` o el hook `PostToolUse` de formato).
+- **Sugerencia de fix (no aplicada):** `loadSkin()` ya está preparada para SSR (devuelve `'classic'`
+  si `typeof window === 'undefined'`), así que un inicializador perezoso —
+  `useState<SkinName>(() => loadSkin(game.id))` — leería `localStorage` directamente durante el
+  render de hidratación en cliente, sin necesitar `setState` dentro de un efecto. El efecto de
+  montaje quedaría solo con `startEngine(skin)` (que no llama `setState`), eliminando el disparo
+  de la regla sin cambiar el comportamiento observable.
+- **Estado:** abierto.
+
 ## ✅ Resueltos
 
-_(vacío por ahora)_
+### Frogger: framerate por debajo del resto del catálogo, más marcado en las skins con glow
+
+- **Detectado en:** spec `game-jam/frogger/02-frogger-niveles`, Fase D (validación con Playwright),
+  25/07/2026.
+- **Resuelto en:** spec `11-optimizacion-rendimiento-frogger`, 25/07/2026.
+- **Archivo:** `app/game-engines/frogger/engine.ts` y `app/game/[id]/play/GamePlayClient.tsx`.
+- **Síntoma original:** medido con `requestAnimationFrame` durante 3 s en `/game/frogger/play`
+  (Playwright, mismo entorno para las tres mediciones): ~45 fps en skin Clásico y ~31 fps en
+  Neon/Retro, frente a 60 fps estables de `/game/snake/play` medidos en la misma sesión de
+  navegador. El framerate era estable (no fluctuaba ni se degradaba progresivamente), solo más
+  bajo que el resto del catálogo.
+- **Causa raíz confirmada** (spec 11, paso 1, con Chrome DevTools Profiler): `drawWaterAndLogs`
+  (el ripple del agua, ~70 puntos × 3 líneas × 5 carriles con `lineTo`/`stroke` recalculando
+  `Math.sin` cada frame) y `drawTurtleGroup` (~20 llamadas a primitivas de canvas por segmento de
+  tortuga) eran los mayores hotspots de JS, **independientes del glow** — confirmado porque
+  `classic` (sin `shadowBlur`) ya perdía ~15% de fps respecto al control. El `ctx.shadowBlur` en
+  vivo (tortugas, troncos, sapo, ocupante de meta) era un agravante adicional, no la causa
+  principal.
+- **Fix aplicado:**
+  - Paso 2: el ripple se precalcula una sola vez en un tile offscreen (es una onda viajera, solo
+    se traslada, nunca cambia de forma) y se traslada por `drawImage()` en vez de recalcular
+    `Math.sin` por punto cada frame; las tortugas pasaron a 2 sprites offscreen (caparazón +
+    detalle) en vez de ~20 llamadas de canvas por segmento.
+  - Paso 3: el `shadowBlur` de tortugas, troncos, sapo y ocupante de meta se hornea una sola vez
+    en sprites offscreen (reconstruidos en cada cambio de skin) en vez de aplicarse en vivo cada
+    frame.
+  - Paso 4: `score`/`lives`/`level` en `GamePlayClient.tsx` migrados de `useState` a `useRef` con
+    actualización directa del DOM, como mejora preventiva del HUD compartido por los 5 juegos.
+- **Resultado medido** (CPU Profiler de Chrome, nivel avanzado, antes/después): `drawWaterAndLogs`
+  pasó de ~30-41 ms a <1 ms de self-time por muestra de 3 s; `drawTurtleGroup` de ~24-29 ms a
+  3-12 ms. La brecha entre skins con/sin glow (15-31% antes) desapareció (1-2 fps de diferencia,
+  dentro del ruido de medición). En build de producción, desktop sin throttling, Frogger pasó de
+  rendir ~87% de la velocidad del control de Snake a 92-96% en los 3 skins.
+- **Caveat de medición:** el número absoluto de ~60 FPS no se pudo confirmar con Playwright/Chromium
+  headless — ni el propio control de Snake (sin cambios) lo sostiene en ese entorno compartido. La
+  resolución se validó por evidencia relativa (colapso del self-time de JS, desaparición de la
+  brecha entre skins, acercamiento al control), decisión aceptada explícitamente por el usuario el
+  25/07/2026. Detalle completo en la "Nota de validación de los criterios de FPS" de
+  `specs/11-optimizacion-rendimiento-frogger.md`.
+- **Estado:** resuelto.
