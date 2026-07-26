@@ -19,19 +19,11 @@ No hay un runner de tests configurado en este proyecto. La verificación de camb
 
 ## Agentes
 
-- **`game-planner`** (`.claude/agents/game-planner.md`) — decide qué juego nuevo conviene integrar a Arcade Vault. Analiza el catálogo (`app/data/games.ts`), los juegos ya implementados y los specs en curso, y propone una recomendación ganadora + shortlist justificada; puede proponer incluso una categoría nueva fuera de `CATS`, señalando que habría que extenderla en `app/data/types.ts`. Mantiene su memoria como un to-do por secciones de estado (🎯 Sugeridos, 👍 Aceptados, ✅ Implementados, 🗑️ Rechazados) en `references/game-suggestions-todo.md`. Solo sugiere: no escribe specs ni código.
-- **`skin-designer`** (`.claude/agents/skin-designer.md`) — audita e implementa el selector de skins visuales (`classic`/`neon`/`retro`) en los juegos que se le indiquen. Revisa si el juego ya tiene el selector en su HUD principal y, si le falta, lo implementa: paleta por skin en el motor (`app/game-engines/<id>/engine.ts`), estado y control en `GamePlayClient.tsx`, y estilos del chrome en `globals.css`. Persiste la elección por juego en `localStorage` (`av_skin_<id>`). A diferencia de `game-planner`, sí escribe y edita código de la aplicación.
-- **`mobile-porter`** (`.claude/agents/mobile-porter.md`) — garantiza que **un juego concreto**, el que se le indique explícitamente, reciba el mismo tratamiento móvil/táctil que los ya implementados (asteroids, tetris, arkanoid, snake), tomando como referencia `specs/10-controles-tactiles-moviles.md`. Opera sobre un solo juego por invocación: audita si ese juego declara su `touchControls` en `app/game-engines/registry.ts` y si su `engine.ts` es compatible con el puente de `KeyboardEvent` sintéticos (filtra por `e.code`), e implementa lo que le falte a ese juego —principalmente su mapeo de controles táctiles— sin tocar la física de ningún motor, sin auditar ni modificar otros juegos del catálogo, y sin duplicar la maquinaria responsive genérica (`GamePlayClient.tsx`, `Nav.tsx`, `globals.css`). Como `skin-designer`, sí escribe y edita código; a diferencia de `game-planner`, no mantiene memoria persistente entre corridas.
+Agentes definidos en `.claude/agents/*.md` (`game-planner`, `skin-designer`, `mobile-porter`, `game-performance-booster`, `game-jam`) — su descripción completa (alcance, qué escriben, memoria) ya se carga automáticamente al usar el tool Agent.
 
 ## Stack técnico
 
-- **Framework**: Next.js 16.2.10 con App Router, React 19.2.4.
-- **Base de datos / backend**: Supabase vía `@supabase/ssr` y `@supabase/supabase-js` (persiste el catálogo de juegos y las puntuaciones). El MCP de Supabase está configurado en `.mcp.json` (`project_ref=payulmltnweemggxbxug`).
-- **Correo**: `resend` para el envío del formulario de contacto (vía Server Action).
-- **Estilos**: Tailwind CSS v4 vía `@tailwindcss/postcss` (sin archivo `tailwind.config.*`; la configuración vive en `postcss.config.mjs` y las directivas de `globals.css`).
-- **Fuentes**: `Press_Start_2P` (`--font-pixel`) y `JetBrains_Mono` (`--font-mono-arcade`) cargadas vía `next/font/google` en `app/layout.tsx`.
-- **TypeScript**: alias de import `@/*` apunta a la raíz del proyecto (ver `tsconfig.json`).
-- **Formato / lint**: Prettier + ESLint (`eslint-config-prettier`). Scripts: `dev`, `build`, `start`, `lint`.
+El MCP de Supabase está configurado en `.mcp.json` (`project_ref=payulmltnweemggxbxug`); persiste el catálogo de juegos y las puntuaciones.
 
 ### Variables de entorno
 
@@ -41,60 +33,11 @@ Ver `.env.local.example`. Se requieren las credenciales de Supabase y `RESEND_AP
 
 Sigue el App Router con el patrón **Server Component + Client Component** (la página `page.tsx` obtiene datos en el servidor y delega la interactividad a un `*Client.tsx`).
 
-### Rutas (`app/`)
-
-- `/` — `page.tsx` + `HomeClient.tsx` (portada).
-- `/games` — `page.tsx` + `GamesClient.tsx` (biblioteca con búsqueda y filtros por categoría).
-- `/game/[id]` — `page.tsx` (detalle del juego).
-- `/game/[id]/play` — `page.tsx` + `GamePlayClient.tsx` (monta el motor en canvas y el HUD).
-- `/about` — `page.tsx` + `ContactForm.tsx` + `actions.ts` (Server Action que envía el correo con Resend).
-- `/hall-of-fame` — `page.tsx` + `HallOfFameClient.tsx` (salón de la fama con podio y tabla).
-- `/auth` — `page.tsx`.
-- `app/layout.tsx` monta `AuthProvider`, el `Nav` global y el footer.
-
-### Datos y dominio
-
-- `app/data/games.ts` — catálogo `GAMES`.
-- `app/data/types.ts` — `Game`, `ScoreRow`, `User`, `GameCategory` y `CATS`.
-- `app/data/players.ts`.
-- `components/` — `GameCard.tsx`, `Nav.tsx`, `Leaderboard.tsx`, `Podium.tsx`.
-
-### Motores de juego (`app/game-engines/`)
-
-Cada juego jugable tiene un motor real en `<canvas>` conectado al HUD de React, portado desde `references/started-games/`.
-
-- Motores: `asteroids/`, `tetris/`, `arkanoid/`, `snake/` (cada uno en su `engine.ts`).
-- `registry.ts` — mapa `GAME_ENGINES` (`id → { createGame, width, height }`) más las interfaces:
-  - `EngineCallbacks`: `onScoreChange`, `onLivesChange`, `onGameOver`, `onPauseChange`, `onLevelChange`.
-  - `EngineInstance`: `pause()`, `resume()`, `destroy()`.
-- Convención: `createGame(canvas, callbacks)` encapsulado, sin variables globales.
-
-### Capa Supabase (`app/lib/supabase/`)
-
-- `client.ts` / `server.ts` — clientes SSR (browser y servidor).
-- `queries.ts` — `getGames`, `getGame`, `getScores`, `getStats` (parametrizadas por `gameId`).
-- `actions.ts` — `saveScore` (Server Action que inserta en `scores`).
-- **Tablas**: `games` (catálogo) y `scores` (puntuaciones por juego y jugador).
-
-### Sesión
-
-- `app/context/auth-context.tsx` — `AuthProvider` / `useAuth`, sesión ligera persistida en `localStorage` (clave `av_user`).
+Convención en `app/game-engines/`: cada motor exporta `createGame(canvas, callbacks)` encapsulado, sin variables globales.
 
 ## Automatización
 
 Hook `PostToolUse` en `.claude/settings.json`: tras cada `Write`/`Edit`, ejecuta `.claude/hooks/format-file.mjs`, que corre Prettier (`--write`) y ESLint (`--fix`) sobre el archivo tocado.
-
-## Metodología del proyecto (Spec Driven Design)
-
-Este proyecto sigue Spec Driven Design usando los comandos `/spec`, `/spec-impl` y `/add-game`, basado en las prácticas de https://github.com/Klerith/fernando-skills. Los skills se instalan con:
-
-```bash
-npx skills@latest add Klerith/fernando-skills
-```
-
-- Los specs viven en `specs/NN-slug.md`, numerados secuencialmente, con un campo `**Estado:**` (`Borrador` → `Aprobado` → `Implementado`).
-- `specs/.spec-config.yml` controla el flujo (`AutoCreateBranch: true`: `/spec-impl` crea la rama `spec-NN-slug` automáticamente).
-- Los juegos fuente que se portan a `app/game-engines/` viven en `references/started-games/` (p. ej. `02-asteroids`, `03-tetris`, `04-arkanoid`).
 
 ## Producto
 

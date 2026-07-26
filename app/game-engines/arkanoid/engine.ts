@@ -115,8 +115,24 @@ const PAUSE_BTN_GAP = 12;
 const PAUSE_BTN_Y = 340;
 const PAUSE_BTN_ROW_X = (CANVAS_W - (5 * PAUSE_BTN_W + 4 * PAUSE_BTN_GAP)) / 2;
 
+// Margen de sangrado reservado en los sprites que hornean el `shadowBlur`
+// (spec 11, mismo patrón aplicado aquí): cubre con holgura el `glowBlur` más
+// alto del catálogo de paletas de este motor (16, `neon`), con la misma
+// proporción ~2x que usó Frogger (margen 28 para blur 14).
+const GLOW_MARGIN = 32;
+
 type BlockColor =
   'red' | 'yellow' | 'cyan' | 'magenta' | 'hotpink' | 'green' | 'gray';
+
+const BLOCK_COLORS: BlockColor[] = [
+  'red',
+  'yellow',
+  'cyan',
+  'magenta',
+  'hotpink',
+  'green',
+  'gray',
+];
 
 interface SpriteFrame {
   sx: number;
@@ -319,10 +335,64 @@ export function createGame(
   let palette = SKIN_PALETTES[currentSkin];
 
   const paddle: Paddle = { x: 0, y: 560, w: 81, h: 14 };
-  const ball: Ball = { x: 0, y: 0, w: 16, h: 16, vx: 200, vy: -300 };
+  const ball: Ball = { x: 0, y: 0, w: 16, h: 16, vx: 0, vy: 0 };
 
-  const bounceSound = new Audio('/assets/arkanoid/ball-bounce.mp3');
-  const breakSound = new Audio('/assets/arkanoid/break-sound.mp3');
+  // Web Audio API en vez de `new Audio(...).cloneNode().play()`: un clon de
+  // `<audio>` no hereda el audio ya decodificado, así que cada colisión
+  // forzaba decodificar el MP3 desde cero — barato en escritorio, pero en el
+  // CPU de un móvil (compitiendo con el propio loop de juego) causaba tanto
+  // retraso audible como cuelgues del frame. Decodificando una sola vez a un
+  // `AudioBuffer` y reproduciéndolo con `AudioBufferSourceNode`, cada disparo
+  // es solo programar PCM ya decodificado: latencia mínima, sin recompetir
+  // por CPU.
+  let audioCtx: AudioContext | null = null;
+  let bounceBuffer: AudioBuffer | null = null;
+  let breakBuffer: AudioBuffer | null = null;
+
+  function loadSound(ctx: AudioContext, url: string): Promise<AudioBuffer> {
+    return fetch(url)
+      .then((res) => res.arrayBuffer())
+      .then((data) => ctx.decodeAudioData(data));
+  }
+
+  function getAudioContext(): AudioContext | null {
+    const AudioContextCtor =
+      window.AudioContext ||
+      (window as unknown as { webkitAudioContext?: typeof AudioContext })
+        .webkitAudioContext;
+    if (!AudioContextCtor) return null;
+    if (!audioCtx) {
+      audioCtx = new AudioContextCtor();
+      Promise.all([
+        loadSound(audioCtx, '/assets/arkanoid/ball-bounce.mp3'),
+        loadSound(audioCtx, '/assets/arkanoid/break-sound.mp3'),
+      ])
+        .then(([bounce, brk]) => {
+          bounceBuffer = bounce;
+          breakBuffer = brk;
+        })
+        .catch(() => {});
+    }
+    return audioCtx;
+  }
+
+  function playSound(buffer: AudioBuffer | null) {
+    if (!audioCtx || !buffer) return;
+    const source = audioCtx.createBufferSource();
+    source.buffer = buffer;
+    source.connect(audioCtx.destination);
+    source.start(0);
+  }
+
+  // El `AudioContext` nace suspendido en la mayoría de navegadores móviles
+  // hasta que se reanuda dentro de un gesto real del usuario — igual que el
+  // desbloqueo de `<audio>`, pero explícito para la Web Audio API. Se
+  // reanuda en el mismo lanzamiento manual de la pelota (`launchBall()`), que
+  // ya es el gesto real que gatea todo el audio de esta partida.
+  function unlockAudio() {
+    const ctx = getAudioContext();
+    if (ctx && ctx.state === 'suspended') ctx.resume().catch(() => {});
+  }
 
   let blocks: Block[] = [];
   let explosions: Explosion[] = [];
@@ -332,11 +402,63 @@ export function createGame(
   let currentLevel = 1;
   let isPaused = false;
   let gameOverFired = false;
+  // La pelota nace pegada al paddle y no se mueve hasta que el jugador la
+  // lanza. Además de ser la mecánica clásica, garantiza que la primera
+  // llamada a `.play()` de un sonido ocurra después de un gesto real del
+  // usuario, que es lo que desbloquea el audio en móvil (ver la entrada de
+  // este bug en `references/pendent-fixes-todo.md`).
+  let ballLaunched = false;
+  const isCoarsePointer = window.matchMedia('(pointer: coarse)').matches;
 
   // Un atlas offscreen por skin: `classic` es el original sin teñir; `neon`
   // y `retro` aplican un filtro de canvas al copiarlo (ver SKIN_PALETTES).
   const ssVariants: Partial<Record<SkinName, HTMLCanvasElement>> = {};
   let ssLoaded = false;
+
+  // Sprites con el glow ya horneado para la skin vigente (spec 11, mismo
+  // patrón que Frogger paso 3): antes, `withGlow` aplicaba `ctx.shadowBlur`
+  // en vivo dentro de los bucles de bloques/explosiones (hasta 60 bloques por
+  // frame en el nivel 1) y en paddle/bola/vidas — ahora cada elemento se
+  // recorta una sola vez a un canvas offscreen con el glow ya horneado, y el
+  // loop de dibujo solo hace `drawImage` sin tocar `shadowBlur`.
+  const paddleSprite = document.createElement('canvas');
+  paddleSprite.width = paddle.w + GLOW_MARGIN * 2;
+  paddleSprite.height = paddle.h + GLOW_MARGIN * 2;
+  const paddleSpriteCtx = paddleSprite.getContext('2d')!;
+
+  const ballSprite = document.createElement('canvas');
+  ballSprite.width = ball.w + GLOW_MARGIN * 2;
+  ballSprite.height = ball.h + GLOW_MARGIN * 2;
+  const ballSpriteCtx = ballSprite.getContext('2d')!;
+
+  const blockSprites = {} as Record<BlockColor, HTMLCanvasElement>;
+  const blockSpriteCtxs = {} as Record<BlockColor, CanvasRenderingContext2D>;
+  for (const color of BLOCK_COLORS) {
+    const sprite = document.createElement('canvas');
+    sprite.width = BLOCK_W + GLOW_MARGIN * 2;
+    sprite.height = BLOCK_H + GLOW_MARGIN * 2;
+    blockSprites[color] = sprite;
+    blockSpriteCtxs[color] = sprite.getContext('2d')!;
+  }
+
+  // Las explosiones comparten tamaño con los bloques (`exp.w/h` se crean a
+  // partir de `block.w/h`): 4 variantes de frame por color, cacheadas igual.
+  const explosionSprites = {} as Record<BlockColor, HTMLCanvasElement[]>;
+  const explosionSpriteCtxs = {} as Record<
+    BlockColor,
+    CanvasRenderingContext2D[]
+  >;
+  for (const color of BLOCK_COLORS) {
+    explosionSprites[color] = EXPLOSION_FRAMES[color].map(() => {
+      const sprite = document.createElement('canvas');
+      sprite.width = BLOCK_W + GLOW_MARGIN * 2;
+      sprite.height = BLOCK_H + GLOW_MARGIN * 2;
+      return sprite;
+    });
+    explosionSpriteCtxs[color] = explosionSprites[color].map((sprite) =>
+      sprite.getContext('2d')!,
+    );
+  }
 
   const keys: Record<'ArrowLeft' | 'ArrowRight', boolean> = {
     ArrowLeft: false,
@@ -367,56 +489,153 @@ export function createGame(
     rawImg.src = '/assets/arkanoid/spritesheet-breakout.png';
   }
 
-  function withGlow(context: CanvasRenderingContext2D, draw: () => void) {
+  // Builders de caché: hornean el `shadowBlur` de la skin vigente una sola
+  // vez por elemento/variante (spec 11, mismo contrato que
+  // `buildTurtleSprites`/`buildLogSprites` de Frogger), en vez de aplicarlo
+  // en vivo dentro de los bucles de dibujo. Se llaman al cargar el atlas y de
+  // nuevo, íntegras, dentro de `setSkin()`.
+  function buildPaddleSprite() {
+    const atlas = ssVariants[currentSkin];
+    paddleSpriteCtx.clearRect(0, 0, paddleSprite.width, paddleSprite.height);
+    if (!atlas) return;
     if (palette.glow) {
-      context.shadowColor = palette.glowColor;
-      context.shadowBlur = palette.glowBlur;
+      paddleSpriteCtx.shadowColor = palette.glowColor;
+      paddleSpriteCtx.shadowBlur = palette.glowBlur;
     }
-    draw();
-    if (palette.glow) context.shadowBlur = 0;
-  }
-
-  function drawFrame(
-    context: CanvasRenderingContext2D,
-    frame: SpriteFrame,
-    x: number,
-    y: number,
-    w: number,
-    h: number,
-  ) {
-    const atlas = ssVariants[currentSkin];
-    if (!ssLoaded || !atlas) return;
-    withGlow(context, () =>
-      context.drawImage(
-        atlas,
-        frame.sx,
-        frame.sy,
-        frame.sw,
-        frame.sh,
-        x,
-        y,
-        w,
-        h,
-      ),
+    paddleSpriteCtx.drawImage(
+      atlas,
+      SPRITES.paddle.sx,
+      SPRITES.paddle.sy,
+      SPRITES.paddle.sw,
+      SPRITES.paddle.sh,
+      GLOW_MARGIN,
+      GLOW_MARGIN,
+      paddle.w,
+      paddle.h,
     );
+    if (palette.glow) paddleSpriteCtx.shadowBlur = 0;
   }
 
-  function drawSprite(
-    context: CanvasRenderingContext2D,
-    name: 'paddle' | 'ball' | `block_${BlockColor}`,
+  function buildBallSprite() {
+    const atlas = ssVariants[currentSkin];
+    ballSpriteCtx.clearRect(0, 0, ballSprite.width, ballSprite.height);
+    if (!atlas) return;
+    if (palette.glow) {
+      ballSpriteCtx.shadowColor = palette.glowColor;
+      ballSpriteCtx.shadowBlur = palette.glowBlur;
+    }
+    ballSpriteCtx.drawImage(
+      atlas,
+      SPRITES.ball.sx,
+      SPRITES.ball.sy,
+      SPRITES.ball.sw,
+      SPRITES.ball.sh,
+      GLOW_MARGIN,
+      GLOW_MARGIN,
+      ball.w,
+      ball.h,
+    );
+    if (palette.glow) ballSpriteCtx.shadowBlur = 0;
+  }
+
+  // Solo hay 7 colores de bloque posibles (`BLOCK_COLORS`), cada uno con un
+  // único frame estático: se cachea una variante por color en vez de aplicar
+  // `shadowBlur` hasta 60 veces por frame (nivel 1 con el tablero lleno).
+  function buildBlockSprites() {
+    const atlas = ssVariants[currentSkin];
+    for (const color of BLOCK_COLORS) {
+      const bctx = blockSpriteCtxs[color];
+      const sprite = blockSprites[color];
+      bctx.clearRect(0, 0, sprite.width, sprite.height);
+      if (!atlas) continue;
+      const sp = SPRITES.blocks[color];
+      if (palette.glow) {
+        bctx.shadowColor = palette.glowColor;
+        bctx.shadowBlur = palette.glowBlur;
+      }
+      bctx.drawImage(
+        atlas,
+        sp.sx,
+        sp.sy,
+        sp.sw,
+        sp.sh,
+        GLOW_MARGIN,
+        GLOW_MARGIN,
+        BLOCK_W,
+        BLOCK_H,
+      );
+      if (palette.glow) bctx.shadowBlur = 0;
+    }
+  }
+
+  // 4 frames × 7 colores: mismo tamaño que un bloque (`exp.w/h` se copian de
+  // `block.w/h` al crear la explosión), cacheados igual que los bloques.
+  function buildExplosionSprites() {
+    const atlas = ssVariants[currentSkin];
+    for (const color of BLOCK_COLORS) {
+      const frames = EXPLOSION_FRAMES[color];
+      const ctxs = explosionSpriteCtxs[color];
+      const sprites = explosionSprites[color];
+      frames.forEach((frame, i) => {
+        const ectx = ctxs[i];
+        ectx.clearRect(0, 0, sprites[i].width, sprites[i].height);
+        if (!atlas) return;
+        if (palette.glow) {
+          ectx.shadowColor = palette.glowColor;
+          ectx.shadowBlur = palette.glowBlur;
+        }
+        ectx.drawImage(
+          atlas,
+          frame.sx,
+          frame.sy,
+          frame.sw,
+          frame.sh,
+          GLOW_MARGIN,
+          GLOW_MARGIN,
+          BLOCK_W,
+          BLOCK_H,
+        );
+        if (palette.glow) ectx.shadowBlur = 0;
+      });
+    }
+  }
+
+  function buildSkinSpriteCaches() {
+    buildPaddleSprite();
+    buildBallSprite();
+    buildBlockSprites();
+    buildExplosionSprites();
+  }
+
+  // El loop de dibujo consume las cachés con `drawImage` (sin tocar
+  // `shadowBlur` en vivo), igual que `drawWaterAndLogs`/`drawTurtleGroup` en
+  // Frogger tras el spec 11.
+  function drawPaddleSprite() {
+    if (!ssLoaded) return;
+    ctx.drawImage(paddleSprite, paddle.x - GLOW_MARGIN, paddle.y - GLOW_MARGIN);
+  }
+
+  function drawBallSpriteAt(x: number, y: number) {
+    if (!ssLoaded) return;
+    ctx.drawImage(ballSprite, x - GLOW_MARGIN, y - GLOW_MARGIN);
+  }
+
+  function drawBlockSprite(color: BlockColor, x: number, y: number) {
+    if (!ssLoaded) return;
+    ctx.drawImage(blockSprites[color], x - GLOW_MARGIN, y - GLOW_MARGIN);
+  }
+
+  function drawExplosionSprite(
+    color: BlockColor,
+    frameIndex: number,
     x: number,
     y: number,
-    w: number,
-    h: number,
   ) {
-    const atlas = ssVariants[currentSkin];
-    if (!ssLoaded || !atlas) return;
-    const sp = name.startsWith('block_')
-      ? SPRITES.blocks[name.slice(6) as BlockColor]
-      : SPRITES[name as 'paddle' | 'ball'];
-    if (!sp) return;
-    withGlow(context, () =>
-      context.drawImage(atlas, sp.sx, sp.sy, sp.sw, sp.sh, x, y, w, h),
+    if (!ssLoaded) return;
+    ctx.drawImage(
+      explosionSprites[color][frameIndex],
+      x - GLOW_MARGIN,
+      y - GLOW_MARGIN,
     );
   }
 
@@ -435,11 +654,20 @@ export function createGame(
   }
 
   function initBall() {
-    const speed = LEVELS[currentLevel - 1].speed;
     ball.x = paddle.x + (paddle.w - ball.w) / 2;
     ball.y = paddle.y - ball.h;
+    ball.vx = 0;
+    ball.vy = 0;
+    ballLaunched = false;
+  }
+
+  function launchBall() {
+    if (ballLaunched || gameState !== 'playing' || isPaused) return;
+    unlockAudio();
+    const speed = LEVELS[currentLevel - 1].speed;
     ball.vx = BASE_BALL_VX * speed;
     ball.vy = BASE_BALL_VY * speed;
+    ballLaunched = true;
   }
 
   function loadLevel(n: number) {
@@ -454,10 +682,7 @@ export function createGame(
       alive: true,
     }));
     explosions = [];
-    ball.x = paddle.x + (paddle.w - ball.w) / 2;
-    ball.y = paddle.y - ball.h;
-    ball.vx = BASE_BALL_VX * level.speed;
-    ball.vy = BASE_BALL_VY * level.speed;
+    initBall();
     callbacks.onLevelChange(currentLevel);
   }
 
@@ -486,23 +711,31 @@ export function createGame(
         paddle.x + PADDLE_SPEED * dt,
       );
 
+    if (!ballLaunched) {
+      // Pegada al centro del paddle: se mueve con él y no colisiona con
+      // nada, así que tampoco puede sonar ni perderse antes del saque.
+      ball.x = paddle.x + (paddle.w - ball.w) / 2;
+      ball.y = paddle.y - ball.h;
+      return;
+    }
+
     ball.x += ball.vx * dt;
     ball.y += ball.vy * dt;
 
     if (ball.x <= 0) {
       ball.x = 0;
       ball.vx = Math.abs(ball.vx);
-      (bounceSound.cloneNode() as HTMLAudioElement).play();
+      playSound(bounceBuffer);
     }
     if (ball.x + ball.w >= canvas.width) {
       ball.x = canvas.width - ball.w;
       ball.vx = -Math.abs(ball.vx);
-      (bounceSound.cloneNode() as HTMLAudioElement).play();
+      playSound(bounceBuffer);
     }
     if (ball.y <= 0) {
       ball.y = 0;
       ball.vy = Math.abs(ball.vy);
-      (bounceSound.cloneNode() as HTMLAudioElement).play();
+      playSound(bounceBuffer);
     }
 
     if (
@@ -514,7 +747,7 @@ export function createGame(
     ) {
       ball.y = paddle.y - ball.h;
       ball.vy = -Math.abs(ball.vy);
-      (bounceSound.cloneNode() as HTMLAudioElement).play();
+      playSound(bounceBuffer);
     }
 
     for (const block of blocks) {
@@ -531,7 +764,7 @@ export function createGame(
         });
         setScore(score + 10);
         ball.vy = -ball.vy;
-        (breakSound.cloneNode() as HTMLAudioElement).play();
+        playSound(breakBuffer);
         if (blocks.every((b) => !b.alive)) {
           if (currentLevel < 5) {
             loadLevel(currentLevel + 1);
@@ -608,20 +841,24 @@ export function createGame(
     }
   }
 
+  function drawLaunchHint() {
+    ctx.fillStyle = palette.hudText;
+    ctx.font = 'bold 16px monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(
+      isCoarsePointer ? 'TOCA LANZAR PARA SACAR' : 'ESPACIO O CLIC PARA LANZAR',
+      canvas.width / 2,
+      480,
+    );
+  }
+
   function draw() {
     ctx.fillStyle = palette.bg;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     for (const block of blocks) {
-      if (block.alive)
-        drawSprite(
-          ctx,
-          `block_${block.color}`,
-          block.x,
-          block.y,
-          block.w,
-          block.h,
-        );
+      if (block.alive) drawBlockSprite(block.color, block.x, block.y);
     }
 
     for (const exp of explosions) {
@@ -629,18 +866,11 @@ export function createGame(
         Math.floor((exp.elapsed / EXPLOSION_DURATION) * 4),
         3,
       );
-      drawFrame(
-        ctx,
-        EXPLOSION_FRAMES[exp.color][frameIndex],
-        exp.x,
-        exp.y,
-        exp.w,
-        exp.h,
-      );
+      drawExplosionSprite(exp.color, frameIndex, exp.x, exp.y);
     }
 
-    drawSprite(ctx, 'paddle', paddle.x, paddle.y, paddle.w, paddle.h);
-    drawSprite(ctx, 'ball', ball.x, ball.y, ball.w, ball.h);
+    drawPaddleSprite();
+    drawBallSpriteAt(ball.x, ball.y);
 
     if (gameState === 'playing') {
       ctx.fillStyle = palette.hudText;
@@ -650,12 +880,15 @@ export function createGame(
       ctx.fillText('Score: ' + score, 10, 10);
       ctx.textAlign = 'center';
       ctx.fillText('Nivel: ' + currentLevel, canvas.width / 2, 10);
+      // Los íconos de vida reutilizan `ballSprite`: comparten el mismo
+      // tamaño (16x16) que la bola en juego, sin necesitar una caché aparte.
       const ballSize = 16;
       const ballSpacing = 4;
       for (let i = 0; i < lives; i++) {
         const bx = canvas.width - 10 - (lives - i) * (ballSize + ballSpacing);
-        drawSprite(ctx, 'ball', bx, 10, ballSize, ballSize);
+        drawBallSpriteAt(bx, 10);
       }
+      if (!ballLaunched && !isPaused) drawLaunchHint();
     }
 
     if (gameState === 'gameover') drawOverlay('GAME OVER');
@@ -682,7 +915,10 @@ export function createGame(
   }
 
   function handleClick(e: MouseEvent) {
-    if (!isPaused) return;
+    if (!isPaused) {
+      launchBall();
+      return;
+    }
     const rect = canvas.getBoundingClientRect();
     const scaleX = canvas.width / rect.width;
     const scaleY = canvas.height / rect.height;
@@ -713,7 +949,13 @@ export function createGame(
     );
   }
 
-  const CAPTURED_KEYS = new Set(['ArrowLeft', 'ArrowRight', 'KeyP', 'Escape']);
+  const CAPTURED_KEYS = new Set([
+    'ArrowLeft',
+    'ArrowRight',
+    'KeyP',
+    'Escape',
+    'Space',
+  ]);
 
   function handleKeyDown(e: KeyboardEvent) {
     const target = e.target as HTMLElement | null;
@@ -727,6 +969,7 @@ export function createGame(
     if (CAPTURED_KEYS.has(e.code)) e.preventDefault();
     if (e.code === 'ArrowLeft') keys.ArrowLeft = true;
     if (e.code === 'ArrowRight') keys.ArrowRight = true;
+    if (e.code === 'Space') launchBall();
     if ((e.code === 'KeyP' || e.code === 'Escape') && gameState === 'playing') {
       setPaused(!isPaused);
     }
@@ -747,6 +990,9 @@ export function createGame(
 
   loadSpritesheet(() => {
     if (destroyed) return;
+    // El atlas ya está listo (`ssVariants`/`ssLoaded`): hornear las cachés de
+    // sprites con glow para la skin inicial antes del primer `draw()`.
+    buildSkinSpriteCaches();
     initPaddle();
     loadLevel(1);
     rafId = requestAnimationFrame(loop);
@@ -767,10 +1013,15 @@ export function createGame(
       canvas.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
+      if (audioCtx) audioCtx.close().catch(() => {});
     },
     setSkin(skin: SkinName) {
       currentSkin = skin;
       palette = SKIN_PALETTES[skin];
+      // Las cachés de paddle/bola/bloques/explosiones hornean el glow de la
+      // skin vigente: hay que reconstruirlas íntegras antes de repintar,
+      // igual que `setSkin()` en Frogger (spec 11).
+      if (ssLoaded) buildSkinSpriteCaches();
       draw();
     },
   };
