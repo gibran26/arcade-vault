@@ -88,6 +88,7 @@ export const GAME_ENGINES: Record<string, EngineEntry> = {
     touchControls: {
       directions: 4,
       joystick: { left: 'ArrowLeft', right: 'ArrowRight' },
+      buttonA: { code: 'Space', label: 'LANZAR', icon: 'thrust' },
     },
   },
   snake: {
