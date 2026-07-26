@@ -91,6 +91,23 @@ const RADII = [0, 16, 30, 50]; // por tamaño 1, 2, 3
 const SPEEDS = [0, 85, 55, 32]; // velocidad base por tamaño
 const POINTS = [0, 100, 50, 20]; // puntos por tamaño
 
+// Margen de sangrado para los sprites que hornean el `shadowBlur` (mismo criterio que
+// Frogger, spec 11 paso 3): cubre con holgura el desenfoque visible incluso en el glowBlur
+// más alto del catálogo (14, `neon`).
+const GLOW_MARGIN = 20;
+
+// Balas: radio fijo y color uniforme por skin, sin variación de geometría por instancia —
+// a diferencia de `Asteroid` (ver su `drawShape`), un único sprite cacheado por skin cubre
+// todas las balas en pantalla. Debe coincidir con `Bullet.radius`.
+const BULLET_RADIUS = 2;
+const BULLET_SPRITE_SIZE = Math.ceil((BULLET_RADIUS + GLOW_MARGIN) * 2);
+
+// Icono de vida del HUD: mismo contorno que la nave (sin llama de empuje ni parpadeo de
+// invencibilidad), siempre dibujado ya rotado -90°; figura estática apta para un solo
+// sprite horneado una vez y reutilizado hasta 3 veces por frame.
+const LIFE_ICON_SPRITE_HALF = Math.ceil(9 + GLOW_MARGIN);
+const LIFE_ICON_SPRITE_SIZE = LIFE_ICON_SPRITE_HALF * 2;
+
 const wrap = (v: number, max: number) => ((v % max) + max) % max;
 const dist = (a: { x: number; y: number }, b: { x: number; y: number }) =>
   Math.hypot(a.x - b.x, a.y - b.y);
@@ -121,16 +138,11 @@ class Bullet {
     if (this.ttl <= 0) this.dead = true;
   }
 
-  draw(ctx: CanvasRenderingContext2D, palette: AsteroidsPalette) {
-    ctx.fillStyle = palette.bullet;
-    if (palette.glow) {
-      ctx.shadowColor = palette.bullet;
-      ctx.shadowBlur = palette.glowBlur * 0.6;
-    }
-    ctx.beginPath();
-    ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-    ctx.fill();
-    if (palette.glow) ctx.shadowBlur = 0;
+  draw(ctx: CanvasRenderingContext2D, sprite: HTMLCanvasElement, half: number) {
+    // Sprite offscreen cacheado por skin (`buildBulletSprite`): radio y color fijos, sin
+    // variación por instancia, así que el glow ya viene horneado — sin `shadowBlur` en vivo
+    // por bala y por frame (antes se aplicaba aquí mismo en cada `Bullet.draw()`).
+    ctx.drawImage(sprite, this.x - half, this.y - half);
   }
 }
 
@@ -181,17 +193,17 @@ class Asteroid {
     ];
   }
 
-  draw(ctx: CanvasRenderingContext2D, palette: AsteroidsPalette) {
+  // La geometría (número y radio de vértices) es aleatoria por instancia — no reducible a un
+  // número finito de variantes, así que no se cachea como sprite offscreen (mismo criterio que
+  // `drawVehicle` en Frogger). Lo que sí se elimina es el costo redundante de reasignar
+  // `strokeStyle`/`lineWidth`/`lineJoin`/`shadowBlur` en cada instancia: ese estado es idéntico
+  // para todos los asteroides de un mismo frame, así que se fija una sola vez en
+  // `drawAsteroidField` (ver más abajo) y aquí solo queda la transformación + el trazo, que sí
+  // varían por instancia.
+  drawShape(ctx: CanvasRenderingContext2D) {
     ctx.save();
     ctx.translate(this.x, this.y);
     ctx.rotate(this.rot);
-    ctx.strokeStyle = palette.asteroid;
-    ctx.lineWidth = 1.5;
-    ctx.lineJoin = 'round';
-    if (palette.glow) {
-      ctx.shadowColor = palette.asteroid;
-      ctx.shadowBlur = palette.glowBlur;
-    }
     ctx.beginPath();
     ctx.moveTo(this.verts[0][0], this.verts[0][1]);
     for (let i = 1; i < this.verts.length; i++)
@@ -404,6 +416,62 @@ export function createGame(
   const ctx = canvas.getContext('2d')!;
   let palette = SKIN_PALETTES[options?.skin ?? 'classic'];
 
+  // Sprites offscreen cacheados (spec 11, mismo patrón de Frogger): geometría fija y
+  // determinista, sin variación por instancia, así que un solo sprite por skin cubre todas
+  // las balas/iconos de vida en pantalla. Se construyen aquí y se reconstruyen íntegros en
+  // `setSkin()` antes de repintar (ver más abajo).
+  const bulletSprite = document.createElement('canvas');
+  bulletSprite.width = BULLET_SPRITE_SIZE;
+  bulletSprite.height = BULLET_SPRITE_SIZE;
+  const bulletSpriteCtx = bulletSprite.getContext('2d')!;
+
+  const lifeIconSprite = document.createElement('canvas');
+  lifeIconSprite.width = LIFE_ICON_SPRITE_SIZE;
+  lifeIconSprite.height = LIFE_ICON_SPRITE_SIZE;
+  const lifeIconCtx = lifeIconSprite.getContext('2d')!;
+
+  function buildBulletSprite() {
+    const c = BULLET_SPRITE_SIZE / 2;
+    bulletSpriteCtx.clearRect(0, 0, BULLET_SPRITE_SIZE, BULLET_SPRITE_SIZE);
+    bulletSpriteCtx.fillStyle = palette.bullet;
+    // Glow horneado una sola vez (antes se aplicaba `shadowBlur` por bala y por frame).
+    if (palette.glow) {
+      bulletSpriteCtx.shadowColor = palette.bullet;
+      bulletSpriteCtx.shadowBlur = palette.glowBlur * 0.6;
+    }
+    bulletSpriteCtx.beginPath();
+    bulletSpriteCtx.arc(c, c, BULLET_RADIUS, 0, Math.PI * 2);
+    bulletSpriteCtx.fill();
+    if (palette.glow) bulletSpriteCtx.shadowBlur = 0;
+  }
+
+  function buildLifeIconSprite() {
+    const cx = LIFE_ICON_SPRITE_HALF;
+    const cy = LIFE_ICON_SPRITE_HALF;
+    lifeIconCtx.clearRect(0, 0, LIFE_ICON_SPRITE_SIZE, LIFE_ICON_SPRITE_SIZE);
+    lifeIconCtx.save();
+    lifeIconCtx.translate(cx, cy);
+    lifeIconCtx.rotate(-Math.PI / 2);
+    lifeIconCtx.strokeStyle = palette.ship;
+    lifeIconCtx.lineWidth = 1.2;
+    lifeIconCtx.lineJoin = 'round';
+    // Glow horneado una sola vez (antes se aplicaba `shadowBlur` por icono y por frame,
+    // hasta 3 veces por frame según las vidas restantes).
+    if (palette.glow) {
+      lifeIconCtx.shadowColor = palette.ship;
+      lifeIconCtx.shadowBlur = palette.glowBlur * 0.5;
+    }
+    lifeIconCtx.beginPath();
+    lifeIconCtx.moveTo(9, 0);
+    lifeIconCtx.lineTo(-6, -5);
+    lifeIconCtx.lineTo(-3, 0);
+    lifeIconCtx.lineTo(-6, 5);
+    lifeIconCtx.closePath();
+    lifeIconCtx.stroke();
+    if (palette.glow) lifeIconCtx.shadowBlur = 0;
+    lifeIconCtx.restore();
+  }
+
   const keys: Record<string, boolean> = {};
   const justPressed: Record<string, boolean> = {};
 
@@ -581,24 +649,35 @@ export function createGame(
   }
 
   function drawLifeIcon(x: number, y: number) {
-    ctx.save();
-    ctx.translate(x, y);
-    ctx.rotate(-Math.PI / 2);
-    ctx.strokeStyle = palette.ship;
-    ctx.lineWidth = 1.2;
+    // Sprite offscreen cacheado (`buildLifeIconSprite`): ya viene rotado y con el glow
+    // horneado, sin `shadowBlur` en vivo por icono y por frame (antes se aplicaba aquí,
+    // hasta 3 veces por frame según las vidas restantes).
+    ctx.drawImage(
+      lifeIconSprite,
+      x - LIFE_ICON_SPRITE_HALF,
+      y - LIFE_ICON_SPRITE_HALF,
+    );
+  }
+
+  function drawAsteroidField() {
+    // El estado compartido (estilo, glow) se fija una sola vez por frame en vez de una vez
+    // por asteroide (ver comentario de `Asteroid.drawShape`); la geometría en sí no se
+    // cachea porque es aleatoria por instancia.
+    if (asteroids.length === 0) return;
+    ctx.strokeStyle = palette.asteroid;
+    ctx.lineWidth = 1.5;
     ctx.lineJoin = 'round';
     if (palette.glow) {
-      ctx.shadowColor = palette.ship;
-      ctx.shadowBlur = palette.glowBlur * 0.5;
+      ctx.shadowColor = palette.asteroid;
+      ctx.shadowBlur = palette.glowBlur;
     }
-    ctx.beginPath();
-    ctx.moveTo(9, 0);
-    ctx.lineTo(-6, -5);
-    ctx.lineTo(-3, 0);
-    ctx.lineTo(-6, 5);
-    ctx.closePath();
-    ctx.stroke();
-    ctx.restore();
+    for (const a of asteroids) a.drawShape(ctx);
+    if (palette.glow) ctx.shadowBlur = 0;
+  }
+
+  function drawBullets() {
+    const half = BULLET_SPRITE_SIZE / 2;
+    for (const b of bullets) b.draw(ctx, bulletSprite, half);
   }
 
   function drawHUD() {
@@ -635,9 +714,9 @@ export function createGame(
     ctx.fillRect(0, 0, W, H);
 
     particles.forEach((p) => p.draw(ctx, palette));
-    asteroids.forEach((a) => a.draw(ctx, palette));
+    drawAsteroidField();
     powerUps.forEach((p) => p.draw(ctx, palette));
-    bullets.forEach((b) => b.draw(ctx, palette));
+    drawBullets();
     ship.draw(ctx, palette);
 
     drawHUD();
@@ -682,6 +761,8 @@ export function createGame(
   window.addEventListener('keydown', handleKeyDown);
   window.addEventListener('keyup', handleKeyUp);
 
+  buildBulletSprite();
+  buildLifeIconSprite();
   initGame();
   rafId = requestAnimationFrame(loop);
 
@@ -708,6 +789,11 @@ export function createGame(
     },
     setSkin(skin: SkinName) {
       palette = SKIN_PALETTES[skin];
+      // El sprite de bala y el icono de vida viven en canvas offscreen cacheados: hay que
+      // regenerarlos con la nueva paleta antes de repintar el frame actual (mismo contrato
+      // que `setSkin()` en Frogger, spec 11).
+      buildBulletSprite();
+      buildLifeIconSprite();
       draw();
     },
   };
