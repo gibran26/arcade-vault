@@ -4,5 +4,6 @@
 | ----------- | --------- | --------- | ------- | --------------------------------------------------- |
 | `arkanoid`  | ARKANOID  | ARCADE    | cyan    | Rebota la pelota y destruye muros de neón.          |
 | `asteroids` | ASTEROIDS | SHOOTER   | yellow  | Pulveriza asteroides en gravedad cero.              |
+| `frogger`   | FROGGER   | ARCADE    | green   | Cruza calle y río esquivando tráfico y troncos.     |
 | `snake`     | SNAKE     | ARCADE    | green   | Crece sin morder tu propia cola.                    |
 | `tetris`    | TETRIS    | PUZZLE    | magenta | Encaja las piezas antes de que el techo te aplaste. |
