@@ -6,6 +6,59 @@ dejó pendiente.
 
 ## 🐛 Abiertos
 
+### RLS deshabilitado en `public.games`, `public.scores` y `public.profiles`
+
+- **Detectado en:** spec `04-integracion-supabase` (`games`/`scores`, deshabilitado explícitamente
+  al crear las tablas) y confirmado/ampliado en spec `12-autenticacion-supabase`, Paso 13
+  (30/07/2026), al agregar `public.profiles` con el mismo tratamiento.
+- **Síntoma:** las tres tablas están completamente expuestas a los roles `anon` y `authenticated`
+  que usan las librerías cliente de Supabase — cualquiera con la clave `anon` (pública en el
+  bundle del frontend) puede leer o modificar cualquier fila de las tres tablas, sin restricción.
+- **Caso especial de `profiles`:** a diferencia de `scores`/`games`, `profiles` expone la columna
+  `email` de cada usuario registrado — un dato más sensible que los puntajes o el catálogo de
+  juegos. Aun así, `12-autenticacion-supabase` decidió explícitamente mantener la misma falta de
+  RLS que `scores`/`games` en vez de aplicar una política parcial solo a esta tabla nueva, para no
+  resolver el problema de forma asimétrica (ver "Decisiones tomadas y descartadas" de esa spec).
+- **Por qué queda pendiente:** ambas specs decidieron explícitamente no mezclar el diseño de
+  políticas de RLS con su propio alcance (integración de Supabase primero, autenticación real
+  después), prefiriendo abordarlo como un spec de seguridad dedicado una vez existiera identidad
+  real (`auth.uid()`) que esas políticas pudieran usar — condición que `12-autenticacion-supabase`
+  ya cumple.
+- **Sugerencia de fix (no aplicada):** diseñar e implementar políticas de RLS para las tres tablas
+  en un spec dedicado, típicamente: lectura pública de `games` y `scores` (necesaria para el salón
+  de la fama y el catálogo), escritura de `scores` restringida a inserciones propias o vía Server
+  Action con `service_role`, y `profiles` con lectura restringida al propio usuario
+  (`auth.uid() = id`) para dejar de exponer emails ajenos.
+- **Estado:** abierto.
+
+### Supabase Auth: el servicio de email compartido tiene un límite de tasa muy bajo, no apto para producción
+
+- **Detectado en:** spec `12-autenticacion-supabase`, Paso 11 (verificación manual end-to-end),
+  30/07/2026.
+- **Síntoma:** durante la verificación E2E, tras enviar un correo de confirmación de registro
+  (`supabase.auth.signUp()`) y, pocos minutos después, un correo de recuperación de contraseña
+  (`supabase.auth.resetPasswordForEmail()`) para la misma cuenta de prueba, la segunda llamada
+  devolvió el error `email rate limit exceeded`.
+- **Causa raíz:** cuando no se configura un proveedor SMTP propio, Supabase envía los correos de
+  Auth (confirmación de registro, recuperación de contraseña, magic link, etc.) a través de un
+  servicio de email **compartido** entre todos los proyectos sin SMTP propio, pensado solo para
+  desarrollo/pruebas. Ese servicio compartido aplica un límite de tasa muy bajo (del orden de un
+  puñado de correos por hora), muy por debajo de lo que necesitaría un flujo de registro/recuperación
+  con usuarios reales.
+- **Por qué queda fuera de esta spec:** `12-autenticacion-supabase` entrega la integración de
+  autenticación en sí; configurar un proveedor SMTP es una tarea operativa de infraestructura,
+  análoga a los pasos 2-3 del plan de esa spec (Redirect URLs y credenciales OAuth) — requiere una
+  cuenta y credenciales de un proveedor de email (ej. Resend, ya usado en el proyecto para el
+  formulario de contacto) que el spec no puede gestionar por sí mismo.
+- **Impacto si no se resuelve antes de producción:** con tráfico real, los correos de confirmación
+  de registro y de recuperación de contraseña empezarán a fallar silenciosamente para varios
+  usuarios en cuanto se supere el límite compartido, bloqueando el flujo de registro/login
+  documentado en `12-autenticacion-supabase`.
+- **Sugerencia de fix (no aplicada):** configurar un proveedor SMTP propio en el dashboard de
+  Supabase (**Authentication → Providers → Email → SMTP Settings**), usando Resend u otro proveedor
+  con un límite de envío adecuado al volumen esperado de la plataforma.
+- **Estado:** abierto.
+
 ### Snake: fin de partida instantáneo tras un `requestAnimationFrame` con `delta` grande
 
 - **Detectado en:** spec `10-controles-tactiles-moviles`, Paso 5 (verificación manual del HUD
